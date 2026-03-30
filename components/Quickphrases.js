@@ -1,16 +1,16 @@
 // components/QuickPhrases.js
-// One-tap phrase buttons — no typing needed.
-// Instantly sends the phrase to History and speaks it aloud.
-// Used in Conversation tab, Text-to-Speech tab.
+// 8 one-tap phrase buttons in a clean 2-column grid.
+// Each tap speaks the phrase immediately and adds it to history.
+// Shows a brief green highlight when spoken.
 
 import { useState } from 'react'
+import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis'
 
-// ── Default phrase bank (emoji + text) ────────────────────────────────────
-const DEFAULT_PHRASES = [
+const PHRASES = [
   { emoji: '🆘', text: 'I need help' },
   { emoji: '💧', text: 'I am thirsty' },
   { emoji: '✋', text: 'Please wait' },
-  { emoji: '🏥', text: 'Call doctor' },
+  { emoji: '📋', text: 'Call doctor' },
   { emoji: '😣', text: 'I am in pain' },
   { emoji: '🙏', text: 'Thank you' },
   { emoji: '😴', text: 'I want to sleep' },
@@ -18,48 +18,31 @@ const DEFAULT_PHRASES = [
 ]
 
 export default function QuickPhrases({ langCode, onAddToHistory }) {
-  const [lastSpoken, setLastSpoken] = useState(null)
+  const [activeIdx, setActiveIdx] = useState(null)
+  const { speak } = useSpeechSynthesis()
 
-  const handlePhrase = (phrase) => {
-    // ── Speak it ────────────────────────────────────────────────────────
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel()
-      const u = new SpeechSynthesisUtterance(phrase.text)
-      u.lang = langCode
-      u.rate = 0.95
-      window.speechSynthesis.speak(u)
-    }
-
-    // ── Add to shared session history ────────────────────────────────────
-    if (onAddToHistory) {
-      onAddToHistory({
-        type:    'quick',
-        text:    phrase.text,
-        emoji:   phrase.emoji,
-        source:  'quick-phrase',
-      })
-    }
-
-    // ── Brief highlight feedback ─────────────────────────────────────────
-    setLastSpoken(phrase.text)
-    setTimeout(() => setLastSpoken(null), 1200)
+  const handlePhrase = (phrase, idx) => {
+    speak({ text: phrase.text, lang: langCode })
+    onAddToHistory?.({ text: phrase.text, type: 'quick', lang: langCode })
+    setActiveIdx(idx)
+    setTimeout(() => setActiveIdx(null), 900)
   }
 
   return (
-    <div className="quick-phrases-wrap">
-      <div className="card-title" style={{ marginBottom: 10 }}>
-        <span>⚡</span> Quick Phrases — tap to speak instantly
+    <div className="card qp-card">
+      <div className="card-title">
+        <span>⚡</span> Quick phrases — tap to speak instantly
       </div>
-      <div className="quick-grid">
-        {DEFAULT_PHRASES.map((p) => (
+      <div className="qp-grid">
+        {PHRASES.map((p, i) => (
           <button
             key={p.text}
-            className={`quick-btn ${lastSpoken === p.text ? 'spoken' : ''}`}
-            onClick={() => handlePhrase(p)}
-            aria-label={`Say: ${p.text}`}
+            className={`qp-btn ${activeIdx === i ? 'qp-spoken' : ''}`}
+            onClick={() => handlePhrase(p, i)}
+            aria-label={`Speak: ${p.text}`}
           >
-            <span className="quick-emoji">{p.emoji}</span>
-            <span className="quick-text">{p.text}</span>
+            <span className="qp-emoji">{p.emoji}</span>
+            <span className="qp-text">{p.text}</span>
           </button>
         ))}
       </div>

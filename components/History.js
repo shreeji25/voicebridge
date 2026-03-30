@@ -1,160 +1,141 @@
 // components/History.js
-// Session conversation log — two display modes:
-//   chatMode=false (default) → classic list with icons, timestamps, re-speak
-//   chatMode=true            → WhatsApp-style chat bubbles for Conversation tab
+// chatMode=true  → WhatsApp-style chat bubbles, auto-scroll, Download + Clear in header
+// chatMode=false → original list style
 
-import { useRef, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis'
 
-// ── Icon map by message source ─────────────────────────────────────────────
-const SOURCE_ICON = {
-  'voice':       '🎤',
-  'type':        '⌨️',
-  'quick-phrase':'⚡',
-  'quick':       '⚡',
+const TYPE_ICONS = { voice: '🎤', typed: '⌨️', quick: '⚡' }
+
+function formatTime(date) {
+  if (!date) return ''
+  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Speak a history item again ─────────────────────────────────────────────
-function speakItem(item, langCode) {
-  if (!window.speechSynthesis) return
-  window.speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(item.text)
-  u.lang  = langCode
-  u.rate  = 0.95
-  window.speechSynthesis.speak(u)
-}
-
-// ── Format timestamp ───────────────────────────────────────────────────────
-function fmt(ts) {
-  if (!ts) return ''
-  const d = ts instanceof Date ? ts : new Date(ts)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-// ── Download history as .txt ───────────────────────────────────────────────
 function downloadHistory(items) {
   if (!items.length) return
-  const text = items
-    .map(i => `[${fmt(i.timestamp)}] ${SOURCE_ICON[i.source] || '💬'} ${i.text}`)
-    .join('\n')
-  const a    = document.createElement('a')
-  a.href     = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text)
-  a.download = 'voicebridge-conversation.txt'
+  const lines = items.map(h =>
+    `${formatTime(h.timestamp)}  ${TYPE_ICONS[h.type] || ''}  ${h.text}`
+  )
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `voicebridge-${new Date().toISOString().slice(0, 10)}.txt`
   a.click()
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// CHAT BUBBLE MODE — used inside Conversation tab
-// ══════════════════════════════════════════════════════════════════════════
-function ChatHistory({ items, langCode, onClear }) {
+export default function History({ items, langCode, onClear, chatMode = false }) {
+  const { speak } = useSpeechSynthesis()
   const bottomRef = useRef(null)
 
-  // Auto-scroll to latest message
+  // Auto-scroll to newest message
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [items])
+    if (chatMode && bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [items, chatMode])
 
-  if (!items.length) {
-    return (
-      <div className="chat-empty">
-        <span style={{ fontSize: 32 }}>💬</span>
-        <p>Your conversation will appear here.</p>
-        <p style={{ fontSize: 12, opacity: 0.5 }}>Type a message or tap a Quick Phrase below.</p>
-      </div>
-    )
+  const handleRepeat = (item) => {
+    speak({ text: item.text, lang: item.lang || langCode })
   }
 
-  return (
-    <div className="chat-wrap">
-      <div className="chat-list">
-        {items.map((item, i) => (
-          <div key={i} className={`chat-bubble-row ${item.source === 'voice' ? 'them' : 'you'}`}>
-            <div
-              className={`chat-bubble ${item.source === 'voice' ? 'bubble-them' : 'bubble-you'}`}
-              onClick={() => speakItem(item, langCode)}
-              title="Tap to repeat"
-            >
-              <span className="bubble-icon">{SOURCE_ICON[item.source] || '💬'}</span>
-              {item.text}
-            </div>
-            <div className="bubble-time">{fmt(item.timestamp)}</div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Toolbar */}
-      <div className="chat-toolbar">
-        <button className="btn btn-secondary" style={{ fontSize: 12, padding: '6px 14px' }}
-          onClick={() => downloadHistory(items)}>
-          ⬇ Download
-        </button>
-        <button className="btn btn-danger" style={{ fontSize: 12, padding: '6px 14px' }}
-          onClick={onClear}>
-          🗑 Clear
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// LIST MODE — used in Voice-to-Text and Text-to-Speech tabs
-// ══════════════════════════════════════════════════════════════════════════
-function ListHistory({ items, langCode, onClear }) {
-  if (!items.length) {
+  // ── CHAT BUBBLE MODE ─────────────────────────────────────
+  if (chatMode) {
     return (
-      <div className="card">
-        <div className="card-title"><span>📋</span> Session History</div>
-        <div className="history-empty">
-          No messages yet — your conversation will appear here.
+      <div className="card chat-card">
+        {/* Header: title + Download + Clear */}
+        <div className="chat-header">
+          <div className="card-title" style={{ margin: 0 }}>
+            <span>💬</span> Conversation
+            {items.length > 0 && (
+              <span className="badge" style={{ marginLeft: 8 }}>{items.length}</span>
+            )}
+          </div>
+          {items.length > 0 && (
+            <div className="chat-actions">
+              <button
+                className="btn btn-secondary chat-action-btn"
+                onClick={() => downloadHistory(items)}
+              >
+                ⬇ Download
+              </button>
+              <button
+                className="btn btn-danger chat-action-btn"
+                onClick={onClear}
+              >
+                🗑 Clear
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Bubbles */}
+        <div className="chat-bubbles">
+          {items.length === 0 ? (
+            <div className="chat-empty">
+              <div className="chat-empty-icon">💬</div>
+              <div>No messages yet.</div>
+              <div style={{ fontSize: 13, marginTop: 4, opacity: 0.7 }}>
+                Tap a quick phrase above, or use the Voice / Text tabs.
+              </div>
+            </div>
+          ) : (
+            items.map((item, idx) => {
+              const isLeft = item.type === 'voice'
+              return (
+                <div key={idx} className={`bubble-row ${isLeft ? 'bubble-left' : 'bubble-right'}`}>
+                  <div
+                    className={`bubble ${isLeft ? 'bubble-voice' : 'bubble-typed'}`}
+                    onClick={() => handleRepeat(item)}
+                    title="Tap to repeat"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => e.key === 'Enter' && handleRepeat(item)}
+                  >
+                    <span className="bubble-icon">{TYPE_ICONS[item.type] || '💬'}</span>
+                    <span className="bubble-text">{item.text}</span>
+                  </div>
+                  <div className={`bubble-meta ${isLeft ? '' : 'bubble-meta-right'}`}>
+                    {formatTime(item.timestamp)}
+                  </div>
+                </div>
+              )
+            })
+          )}
+          <div ref={bottomRef} />
         </div>
       </div>
     )
   }
 
+  // ── LIST MODE ────────────────────────────────────────────
   return (
     <div className="card">
-      <div className="card-title" style={{ justifyContent: 'space-between' }}>
-        <span><span>📋</span> Session History</span>
-        <div className="btn-row" style={{ gap: 8 }}>
-          <button className="btn btn-secondary" style={{ fontSize: 12, padding: '4px 12px' }}
-            onClick={() => downloadHistory(items)}>
-            ⬇ Download
-          </button>
-          <button className="btn btn-danger" style={{ fontSize: 12, padding: '4px 12px' }}
-            onClick={onClear}>
-            🗑 Clear
-          </button>
-        </div>
-      </div>
-
-      <div className="history-list">
-        {[...items].reverse().map((item, i) => (
-          <div
-            key={i}
-            className="history-item"
-            onClick={() => speakItem(item, langCode)}
-            title="Click to repeat this message"
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => e.key === 'Enter' && speakItem(item, langCode)}
-          >
-            <div className="history-icon">{SOURCE_ICON[item.source] || '💬'}</div>
-            <div className="history-text">{item.text}</div>
-            <div className="history-meta">{fmt(item.timestamp)}</div>
+      <div className="card-title" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center', width: '100%' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>📋</span> Session history
+          {items.length > 0 && <span className="badge">{items.length}</span>}
+        </span>
+        {items.length > 0 && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => downloadHistory(items)}>⬇ Download</button>
+            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={onClear}>Clear</button>
           </div>
-        ))}
+        )}
+      </div>
+      <div className="history-list">
+        {items.length === 0 ? (
+          <div className="history-empty">No messages yet.</div>
+        ) : (
+          [...items].reverse().map((item, idx) => (
+            <div key={idx} className="history-item" onClick={() => handleRepeat(item)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && handleRepeat(item)}>
+              <span className="history-icon">{TYPE_ICONS[item.type] || '💬'}</span>
+              <span className="history-text">{item.text}</span>
+              <span className="history-meta">{formatTime(item.timestamp)}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
-}
-
-// ══════════════════════════════════════════════════════════════════════════
-// MAIN EXPORT — switches between modes via chatMode prop
-// ══════════════════════════════════════════════════════════════════════════
-export default function History({ items = [], langCode, onClear, chatMode = false }) {
-  if (chatMode) {
-    return <ChatHistory items={items} langCode={langCode} onClear={onClear} />
-  }
-  return <ListHistory items={items} langCode={langCode} onClear={onClear} />
 }
