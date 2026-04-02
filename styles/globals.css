@@ -776,9 +776,9 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 24px;
-  position: relative;
   overflow: hidden;
+  position: relative;
+  transition: border-color 0.2s;
 }
 .settings-section::before {
   content: '';
@@ -786,26 +786,70 @@ input[type='range']::-webkit-slider-thumb {
   top: 0; left: 0; right: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(0,212,255,0.12), transparent);
+  pointer-events: none;
+  z-index: 1;
 }
+/* Full-width clickable header button */
 .settings-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px 24px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: 'Sora', sans-serif;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 16px;
+  color: var(--text-muted);
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  gap: 10px;
+  user-select: none;
 }
+.settings-section-title:hover {
+  background: rgba(0, 212, 255, 0.04);
+  color: var(--text);
+}
+html[data-theme="light"] .settings-section-title:hover {
+  background: rgba(0, 153, 204, 0.06);
+}
+/* Chevron arrow inside header */
+.settings-chevron {
+  font-size: 12px;
+  color: var(--text-dim);
+  transition: transform 0.25s ease, color 0.15s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.settings-section-title:hover .settings-chevron { color: var(--accent); }
+.settings-chevron.open { transform: rotate(180deg); }
+
+/* Section body shown when open */
+.settings-section-body {
+  padding: 0 24px 20px;
+  border-top: 1px solid var(--border);
+}
+.settings-section-body.hidden { display: none; }
 
 /* Toggle switch row */
 .toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   gap: 12px;
+  transition: background 0.15s;
+  border-radius: 6px;
 }
+.toggle-row:hover { background: rgba(0,212,255,0.03); }
+html[data-theme="light"] .toggle-row:hover { background: rgba(0,153,204,0.05); }
 .toggle-row:last-of-type { border-bottom: none; }
 .toggle-left {
   display: flex;
@@ -825,11 +869,16 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--border);
   position: relative;
   cursor: pointer;
-  transition: background 0.25s;
+  transition: background 0.25s, border-color 0.25s;
   flex-shrink: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-hi);
+}
+html[data-theme="light"] .toggle-switch {
+  background: #c8d4e8;
+  border-color: #8aaad0;
 }
 .toggle-switch.on { background: var(--accent); border-color: var(--accent); }
+html[data-theme="light"] .toggle-switch.on { background: #0099cc; border-color: #0099cc; }
 .toggle-thumb {
   position: absolute;
   top: 3px;
@@ -1244,29 +1293,27 @@ html[data-theme="light"].high-contrast {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
-  border-radius: 20px;
+  padding: 10px 20px;
+  border-radius: 24px;
   border: 1.5px solid var(--border-hi);
   background: var(--bg-inset);
   color: var(--text);
-  font-size: 0.9rem;
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, transform 0.1s;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.1s;
   white-space: nowrap;
   flex-shrink: 0;
 }
 .theme-toggle-btn:hover {
-  background: var(--border);
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
   transform: translateY(-1px);
 }
-.theme-toggle-btn:active {
-  transform: translateY(0);
+html[data-theme="light"] .theme-toggle-btn:hover {
+  box-shadow: 0 0 0 3px rgba(0,153,204,0.12);
 }
-.theme-btn-dark {
-  border-color: var(--accent2);
-}
-.theme-btn-light {
-  border-color: var(--accent);
-}
+.theme-toggle-btn:active { transform: translateY(0); }
+.theme-btn-dark  { border-color: var(--accent2); }
+.theme-btn-light { border-color: var(--accent);  }
