@@ -1,6 +1,6 @@
-// components/Settings.js — Updated with Light/Dark mode + full i18n support
+// components/Settings.js
 // Props: history, onClearHistory, largeText, onLargeTextChange,
-//        highContrast, onHighContrastChange, langCode, theme, onThemeChange
+//        highContrast, onHighContrastChange, langCode, theme, onThemeChange, t
 
 import { useState, useEffect } from "react";
 import { getT } from "../translations";
@@ -13,164 +13,194 @@ export default function Settings({
   highContrast,
   onHighContrastChange,
   langCode = "en-US",
-  theme,          // "dark" | "light"  — passed from index.js
-  onThemeChange,  // (newTheme) => void
+  theme,
+  onThemeChange,
+  t: tProp,
 }) {
-  const t = getT(langCode);
+  const t = tProp || getT(langCode);
 
   const [reduceMotion, setReduceMotion] = useState(false);
-  const [fontSize, setFontSize] = useState("medium");
-  const [rate, setRate] = useState(1.0);
-  const [pitch, setPitch] = useState(1.0);
-  const [micStatus, setMicStatus] = useState("unknown");
-  const [voiceSupported] = useState(() => "SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-  const [ttsSupported] = useState(() => "speechSynthesis" in window);
-  const [openSection, setOpenSection] = useState("appearance");
+  const [fontSize, setFontSize]         = useState("medium");
+  const [rate, setRate]                 = useState(1.0);
+  const [pitch, setPitch]               = useState(1.0);
+  const [volume, setVolume]             = useState(100);
+  const [micStatus, setMicStatus]       = useState("unknown");
+  const [openSection, setOpenSection]   = useState("appearance");
+  const [isOnline, setIsOnline]         = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
 
-  // Sync reduceMotion class
-  useEffect(() => {
-    document.body.classList.toggle("reduce-motion", reduceMotion);
-  }, [reduceMotion]);
+  const [voiceSupported] = useState(
+    () => typeof window !== "undefined" &&
+      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
+  );
+  const [ttsSupported] = useState(
+    () => typeof window !== "undefined" && "speechSynthesis" in window
+  );
 
-  // Sync font size
   useEffect(() => {
-    document.documentElement.setAttribute("data-fontsize", fontSize);
-  }, [fontSize]);
+    const on  = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener("online",  on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+
+  useEffect(() => { document.body.classList.toggle("reduce-motion", reduceMotion); }, [reduceMotion]);
+  useEffect(() => { document.documentElement.setAttribute("data-fontsize", fontSize); }, [fontSize]);
 
   function handleTestVoice() {
     if (!ttsSupported) return;
-    const u = new SpeechSynthesisUtterance(t.settingsTestVoice);
-    u.lang = langCode;
-    u.rate = rate;
-    u.pitch = pitch;
+    const u = new SpeechSynthesisUtterance(t.settingsTestVoice || "Testing voice output");
+    u.lang = langCode; u.rate = rate; u.pitch = pitch; u.volume = volume / 100;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   }
 
   async function handleTestMic() {
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      setMicStatus("granted");
-    } catch (e) {
-      setMicStatus("denied");
-    }
+    try { await navigator.mediaDevices.getUserMedia({ audio: true }); setMicStatus("granted"); }
+    catch { setMicStatus("denied"); }
   }
 
   function handleDownload() {
-    const lines = history.map(
-      (m) => `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.source}: ${m.text}`
-    );
+    if (!history.length) return;
+    const lines = history.map((m) => `[${new Date(m.timestamp).toLocaleTimeString()}]  ${m.text}`);
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "voicebridge-history.txt";
+    a.download = `voicebridge-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
   }
 
   function handleClear() {
-    if (window.confirm(t.historyClearConfirm)) onClearHistory();
+    if (window.confirm(t.historyClearConfirm || "Clear all history?")) onClearHistory?.();
   }
 
-  const toggleSection = (key) => setOpenSection(openSection === key ? null : key);
-
-  const SectionHeader = ({ sectionKey, label }) => (
-    <button
-      className="settings-section-title"
-      onClick={() => toggleSection(sectionKey)}
-      aria-expanded={openSection === sectionKey}
-    >
-      {label}
-      <span className="settings-chevron">{openSection === sectionKey ? "▲" : "▼"}</span>
-    </button>
-  );
-
-  const Toggle = ({ checked, onChange, label, desc }) => (
-    <div className="settings-row">
-      <div className="settings-label-group">
-        <span className="settings-label">{label}</span>
-        {desc && <span className="settings-desc">{desc}</span>}
-      </div>
-      <label className="toggle-switch">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span className="toggle-thumb" />
-      </label>
-    </div>
-  );
+  const toggleSection = (key) => setOpenSection((prev) => (prev === key ? null : key));
+  const isDark = theme === "dark";
 
   const micStatusText =
-    micStatus === "granted"
-      ? t.settingsGranted
-      : micStatus === "denied"
-      ? t.settingsDenied
-      : micStatus === "prompt"
-      ? t.settingsPrompt
-      : t.settingsUnknown;
+    micStatus === "granted" ? (t.settingsGranted   || "Granted")
+    : micStatus === "denied"  ? (t.settingsDenied  || "Denied")
+    : micStatus === "prompt"  ? (t.settingsPrompt  || "Pending")
+    :                           (t.settingsUnknown || "Unknown");
 
-  const isDark = theme === "dark";
+  const micBadgeClass =
+    micStatus === "granted" ? "badge-ok" : micStatus === "denied" ? "badge-fail" : "badge-warn";
+
+  // ── Reusable sub-components ──────────────────────────────────
+
+  function SectionHeader({ sectionKey, icon, label }) {
+    const isOpen = openSection === sectionKey;
+    return (
+      <button className="sp-header" onClick={() => toggleSection(sectionKey)} aria-expanded={isOpen}>
+        <div className="sp-header-left">
+          <span className="sp-icon">{icon}</span>
+          <span className="sp-title">{label}</span>
+        </div>
+        <svg className={`sp-chevron${isOpen ? " open" : ""}`} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <polyline points="4,6 8,10 12,6" />
+        </svg>
+      </button>
+    );
+  }
+
+  function ToggleRow({ checked, onChange, label, desc }) {
+    return (
+      <div className="sp-toggle-row">
+        <div className="sp-toggle-left">
+          <span className="sp-toggle-label">{label}</span>
+          {desc && <span className="sp-toggle-desc">{desc}</span>}
+        </div>
+        <button
+          className={`sp-toggle${checked ? " on" : ""}`}
+          onClick={() => onChange(!checked)}
+          role="switch"
+          aria-checked={checked}
+        >
+          <span className="sp-toggle-thumb" />
+        </button>
+      </div>
+    );
+  }
+
+  function SliderRow({ label, displayValue, min, max, step, onInput }) {
+    return (
+      <div className="sp-slider-row">
+        <div className="sp-slider-label">
+          <span className="sp-slider-name">{label}</span>
+          <span className="sp-slider-val">{displayValue}</span>
+        </div>
+        <input
+          type="range"
+          min={min} max={max} step={step}
+          value={parseFloat(displayValue)}
+          onChange={(e) => onInput(parseFloat(e.target.value))}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="settings-page">
-      <h2 className="settings-main-title">{t.settingsTitle}</h2>
 
-      {/* ── APPEARANCE (Light / Dark) ─────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="appearance" label={t.settingsAppearance} />
+      {/* Page header with online/offline badge */}
+      <div className="sp-page-header">
+        <h2 className="sp-page-title">{t.settingsTitle || "Settings"}</h2>
+        <span className={`sp-status-badge${isOnline ? " online" : " offline"}`}>
+          <span className="sp-status-dot" />
+          {isOnline ? (t.statusOnline || "Online") : (t.statusOffline || "Offline")}
+        </span>
+      </div>
+
+      {/* ── APPEARANCE ──────────────────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="appearance" icon="☀️" label={t.settingsAppearance || "Appearance"} />
         {openSection === "appearance" && (
-          <div className="settings-body">
-            <div className="settings-row">
-              <div className="settings-label-group">
-                <span className="settings-label">
-                  {isDark ? t.settingsDarkMode : t.settingsLightMode}
+          <div className="sp-body">
+            <div className="sp-appear-row">
+              <div className="sp-toggle-left">
+                <span className="sp-toggle-label">
+                  {isDark ? (t.settingsDarkMode || "Dark mode") : (t.settingsLightMode || "Light mode")}
                 </span>
-                <span className="settings-desc">{t.settingsThemeDesc}</span>
+                <span className="sp-toggle-desc">
+                  {t.settingsThemeDesc || "Switch between dark and light interface"}
+                </span>
               </div>
               <button
-                className={`theme-toggle-btn ${isDark ? "theme-btn-dark" : "theme-btn-light"}`}
-                onClick={() => onThemeChange(isDark ? "light" : "dark")}
-                aria-label={isDark ? t.settingsLightMode : t.settingsDarkMode}
-                title={isDark ? t.settingsLightMode : t.settingsDarkMode}
+                className={`sp-theme-btn${isDark ? " theme-dark" : " theme-light"}`}
+                onClick={() => onThemeChange?.(isDark ? "light" : "dark")}
               >
-                {isDark ? "☀️" : "🌙"}
-                <span>{isDark ? t.settingsLightMode : t.settingsDarkMode}</span>
+                <span className="sp-theme-dot" style={{ background: isDark ? "#7c3aed" : "#f59e0b" }} />
+                {isDark ? (t.settingsLightMode || "Switch to light") : (t.settingsDarkMode || "Switch to dark")}
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── ACCESSIBILITY ─────────────────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="accessibility" label={t.settingsAccessibility} />
+      {/* ── ACCESSIBILITY ───────────────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="accessibility" icon="♿" label={t.settingsAccessibility || "Accessibility"} />
         {openSection === "accessibility" && (
-          <div className="settings-body">
-            <Toggle
-              checked={largeText}
-              onChange={onLargeTextChange}
-              label={t.settingsLargeText}
-              desc={t.settingsLargeTextDesc}
-            />
-            <Toggle
-              checked={highContrast}
-              onChange={onHighContrastChange}
-              label={t.settingsHighContrast}
-              desc={t.settingsHighContrastDesc}
-            />
-            <Toggle
-              checked={reduceMotion}
-              onChange={setReduceMotion}
-              label={t.settingsReduceMotion}
-              desc={t.settingsReduceMotionDesc}
-            />
-            <div className="settings-row settings-row-col">
-              <span className="settings-label">{t.settingsFontSize}</span>
-              <div className="fontsize-tabs">
-                {["small", "medium", "large", "xlarge"].map((s, i) => (
-                  <button
-                    key={s}
-                    className={`fontsize-tab ${fontSize === s ? "active" : ""}`}
-                    onClick={() => setFontSize(s)}
-                  >
-                    {[t.settingsFontSmall, t.settingsFontMedium, t.settingsFontLarge, t.settingsFontXLarge][i]}
+          <div className="sp-body">
+            <ToggleRow checked={largeText}    onChange={onLargeTextChange}    label={t.settingsLargeText    || "Large text & buttons"}  desc={t.settingsLargeTextDesc    || "Increases font size and button size across the app"} />
+            <ToggleRow checked={highContrast} onChange={onHighContrastChange} label={t.settingsHighContrast || "High contrast"}          desc={t.settingsHighContrastDesc || "Black and white mode for maximum readability"} />
+            <ToggleRow checked={reduceMotion} onChange={setReduceMotion}      label={t.settingsReduceMotion || "Reduce animations"}      desc={t.settingsReduceMotionDesc || "Disables all animations and transitions"} />
+            <div className="sp-fontsize-row">
+              <div className="sp-toggle-left">
+                <span className="sp-toggle-label">{t.settingsFontSize || "Font size"}</span>
+                <span className="sp-toggle-desc">{t.settingsFontSizeDesc || "Choose your preferred reading size"}</span>
+              </div>
+              <div className="sp-fontsize-pills">
+                {[
+                  ["small",  t.settingsFontSmall  || "Small"],
+                  ["medium", t.settingsFontMedium || "Medium"],
+                  ["large",  t.settingsFontLarge  || "Large"],
+                  ["xlarge", t.settingsFontXLarge || "X-Large"],
+                ].map(([key, lbl]) => (
+                  <button key={key} className={`sp-pill${fontSize === key ? " active" : ""}`} onClick={() => setFontSize(key)}>
+                    {lbl}
                   </button>
                 ))}
               </div>
@@ -179,88 +209,103 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── VOICE SETTINGS ───────────────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="voice" label={t.settingsVoice} />
+      {/* ── VOICE SETTINGS ──────────────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="voice" icon="🎙️" label={t.settingsVoice || "Voice settings"} />
         {openSection === "voice" && (
-          <div className="settings-body">
-            <div className="settings-slider-row">
-              <label>{t.settingsSpeechRate} <b>{rate.toFixed(1)}×</b></label>
-              <input type="range" min="0.5" max="2" step="0.1" value={rate}
-                onChange={(e) => setRate(parseFloat(e.target.value))} />
-            </div>
-            <div className="settings-slider-row">
-              <label>{t.settingsSpeechPitch} <b>{pitch.toFixed(1)}</b></label>
-              <input type="range" min="0.5" max="2" step="0.1" value={pitch}
-                onChange={(e) => setPitch(parseFloat(e.target.value))} />
-            </div>
-            <button className="btn-secondary" onClick={handleTestVoice}>{t.settingsTestVoice}</button>
+          <div className="sp-body">
+            <SliderRow label={t.settingsSpeechRate  || "Speech rate"}  displayValue={rate.toFixed(1) + "×"} min={0.5} max={2}   step={0.1} onInput={setRate}   />
+            <SliderRow label={t.settingsSpeechPitch || "Speech pitch"} displayValue={pitch.toFixed(1)}      min={0}   max={2}   step={0.1} onInput={setPitch}  />
+            <SliderRow label={t.settingsVolume      || "Volume"}       displayValue={volume + "%"}           min={0}   max={100} step={1}   onInput={setVolume} />
+            <button className="sp-action-btn" onClick={handleTestVoice}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3 4.5l10 3.5-10 3.5V4.5z"/></svg>
+              {t.settingsTestVoice || "Test voice"}
+            </button>
           </div>
         )}
       </div>
 
-      {/* ── CONVERSATION HISTORY ─────────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="history" label={t.settingsHistory} />
+      {/* ── CONVERSATION HISTORY ────────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="history" icon="💬" label={t.settingsHistory || "Conversation history"} />
         {openSection === "history" && (
-          <div className="settings-body">
-            <p className="settings-desc">
-              <b>{history.length}</b> {t.settingsMessages}
-            </p>
-            <div className="settings-btn-row">
-              <button className="btn-secondary" onClick={handleDownload}>{t.settingsDownload}</button>
-              <button className="btn-danger" onClick={handleClear}>{t.settingsClear}</button>
+          <div className="sp-body">
+            <div className="sp-hist-stat">
+              <span className="sp-hist-count">{history.length}</span>
+              <span className="sp-hist-sub">{t.settingsMessages || "messages this session"}</span>
+            </div>
+            <div className="sp-btn-row">
+              <button className="sp-action-btn" onClick={handleDownload} disabled={!history.length}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12l-5-5 1.4-1.4L7 9.2V2h2v7.2l2.6-3.6L13 7l-5 5zm-6 2v-2h12v2H2z"/></svg>
+                {t.settingsDownload || "Download .txt"}
+              </button>
+              <button className="sp-danger-btn" onClick={handleClear} disabled={!history.length}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6 2h4v1H6V2zM2 4h12v1H3.5l.8 9H11.7l.8-9H13v-1H2V4zM6 7h1v5H6V7zm3 0h1v5H9V7z"/></svg>
+                {t.settingsClear || "Clear history"}
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── BROWSER COMPATIBILITY ────────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="compat" label={t.settingsCompat} />
+      {/* ── BROWSER COMPATIBILITY ───────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="compat" icon="🌐" label={t.settingsCompat || "Browser compatibility"} />
         {openSection === "compat" && (
-          <div className="settings-body">
-            <ul className="compat-list">
-              <li>
-                <span>{t.settingsVoiceRecog}</span>
-                <span className={voiceSupported ? "compat-ok" : "compat-no"}>
-                  {voiceSupported ? t.settingsAvailable : t.settingsNotAvailable}
-                </span>
-              </li>
-              <li>
-                <span>{t.settingsTextSpeech}</span>
-                <span className={ttsSupported ? "compat-ok" : "compat-no"}>
-                  {ttsSupported ? t.settingsAvailable : t.settingsNotAvailable}
-                </span>
-              </li>
-              <li>
-                <span>{t.settingsMicPerm}</span>
-                <span className={micStatus === "granted" ? "compat-ok" : "compat-warn"}>
-                  {micStatusText}
-                </span>
-              </li>
-            </ul>
-            <button className="btn-secondary" onClick={handleTestMic}>{t.settingsTestMic}</button>
+          <div className="sp-body">
+            <div className="sp-compat-item">
+              <span className="sp-compat-name">{t.settingsVoiceRecog || "Voice recognition"}</span>
+              <span className={`sp-badge ${voiceSupported ? "badge-ok" : "badge-fail"}`}>{voiceSupported ? (t.settingsAvailable || "Available") : (t.settingsNotAvailable || "Not available")}</span>
+            </div>
+            <div className="sp-compat-item">
+              <span className="sp-compat-name">{t.settingsTextSpeech || "Text-to-speech"}</span>
+              <span className={`sp-badge ${ttsSupported ? "badge-ok" : "badge-fail"}`}>{ttsSupported ? (t.settingsAvailable || "Available") : (t.settingsNotAvailable || "Not available")}</span>
+            </div>
+            <div className="sp-compat-item">
+              <span className="sp-compat-name">{t.settingsMicPerm || "Mic permission"}</span>
+              <span className={`sp-badge ${micBadgeClass}`}>{micStatusText}</span>
+            </div>
+            <button className="sp-action-btn" style={{ marginTop: "14px" }} onClick={handleTestMic}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3zm-5 7a5 5 0 0 0 10 0h-1a4 4 0 0 1-8 0H3zm4 7v-2H6v-1h4v1H9v2H7z"/></svg>
+              {t.settingsTestMic || "Test microphone"}
+            </button>
             {micStatus === "denied" && (
-              <p className="settings-desc settings-warn">{t.settingsMicDeniedFix}</p>
+              <p className="sp-warn-note">{t.settingsMicDeniedFix || "Microphone access was denied. Please allow it in your browser settings."}</p>
             )}
           </div>
         )}
       </div>
 
       {/* ── ABOUT & PRIVACY ─────────────────────────────────── */}
-      <div className="settings-section">
-        <SectionHeader sectionKey="about" label={t.settingsAbout} />
+      <div className="sp-section">
+        <SectionHeader sectionKey="about" icon="ℹ️" label={t.settingsAbout || "About & privacy"} />
         {openSection === "about" && (
-          <div className="settings-body">
-            <div className="about-grid">
-              <span>{t.settingsVersion}</span>
-              <span>{t.settingsBuiltWith}</span>
-              <span>{t.settingsPrivacy}</span>
+          <div className="sp-body">
+            <div className="sp-about-grid">
+              <div className="sp-about-card">
+                <div className="sp-about-key">{t.settingsVersionLabel || "Version"}</div>
+                <div className="sp-about-val">1.0.0</div>
+              </div>
+              <div className="sp-about-card">
+                <div className="sp-about-key">{t.settingsBuiltWith || "Built with"}</div>
+                <div className="sp-about-val">Next.js + Web Speech API</div>
+              </div>
+              <div className="sp-about-card">
+                <div className="sp-about-key">{t.settingsDataStorage || "Data storage"}</div>
+                <div className="sp-about-val">{t.settingsOnDevice || "On-device only"}</div>
+              </div>
+              <div className="sp-about-card">
+                <div className="sp-about-key">{t.settingsNetwork || "Network requests"}</div>
+                <div className="sp-about-val">{t.settingsNone || "None"}</div>
+              </div>
+            </div>
+            <div className="sp-privacy-note">
+              🔒 {t.settingsPrivacy || "Zero data sent to servers — all processing is 100% on-device."}
             </div>
           </div>
         )}
       </div>
+
     </div>
   );
 }
