@@ -17,9 +17,11 @@ const PHRASES = [
   { emoji: '🍽️', text: 'I am hungry' },
 ]
 
-export default function QuickPhrases({ langCode, onAddToHistory }) {
+export default function QuickPhrases({ langCode, onAddToHistory, t }) {
   const [activeIdx, setActiveIdx] = useState(null)
   const { speak } = useSpeechSynthesis()
+
+  const phrases = (t && t.qpPhrases) ? t.qpPhrases : PHRASES
 
   const handlePhrase = (phrase, idx) => {
     speak({ text: phrase.text, lang: langCode })
@@ -34,7 +36,7 @@ export default function QuickPhrases({ langCode, onAddToHistory }) {
         <span>⚡</span> Quick phrases — tap to speak instantly
       </div>
       <div className="qp-grid">
-        {PHRASES.map((p, i) => (
+        {phrases.map((p, i) => (
           <button
             key={p.text}
             className={`qp-btn ${activeIdx === i ? 'qp-spoken' : ''}`}

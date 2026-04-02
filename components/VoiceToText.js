@@ -6,7 +6,7 @@ import { useState, useCallback } from 'react'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { useSpeechSynthesis }   from '../hooks/useSpeechSynthesis'
 
-export default function VoiceToText({ langCode, onAddToHistory }) {
+export default function VoiceToText({ langCode, onAddToHistory, t }) {
   const [finalText, setFinalText] = useState('')
 
   // Called when the recognition engine gives us a confirmed result
@@ -62,7 +62,7 @@ export default function VoiceToText({ langCode, onAddToHistory }) {
           <button
             className={`mic-btn ${isListening ? 'listening' : ''}`}
             onClick={isListening ? stopListening : startListening}
-            aria-label={isListening ? 'Stop listening' : 'Start listening'}
+            aria-label={isListening ? (t ? t.vttStopListening : 'Stop listening') : (t ? t.vttStartListening : 'Start listening')}
             title={isListening ? 'Click to stop' : 'Click to start speaking'}
           >
             {isListening ? '⏹️' : '🎤'}
@@ -76,7 +76,7 @@ export default function VoiceToText({ langCode, onAddToHistory }) {
           </div>
 
           <div className={`mic-label ${isListening ? 'active' : ''}`}>
-            {isListening ? '🔴 Listening… speak now' : 'Click the mic to start speaking'}
+            {isListening ? (t ? t.vttListeningLabel : '🔴 Listening… speak now') : (t ? t.vttIdleLabel : 'Click the mic to start speaking')}
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export default function VoiceToText({ langCode, onAddToHistory }) {
         >
           {!finalText && !interimText ? (
             <div className="transcript-placeholder">
-              Your spoken words will appear here in real time…
+              {t ? t.vttPlaceholder : 'Your spoken words will appear here in real time…'}
             </div>
           ) : (
             <>

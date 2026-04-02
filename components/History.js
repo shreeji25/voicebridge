@@ -24,7 +24,7 @@ function downloadHistory(items) {
   a.click()
 }
 
-export default function History({ items, langCode, onClear, chatMode = false }) {
+export default function History({ items, langCode, onClear, chatMode = false, t }) {
   const { speak } = useSpeechSynthesis()
   const bottomRef = useRef(null)
 
@@ -57,13 +57,13 @@ export default function History({ items, langCode, onClear, chatMode = false }) 
                 className="btn btn-secondary chat-action-btn"
                 onClick={() => downloadHistory(items)}
               >
-                ⬇ Download
+                ⬇ {t ? t.historyDownload : 'Download'}
               </button>
               <button
                 className="btn btn-danger chat-action-btn"
                 onClick={onClear}
               >
-                🗑 Clear
+                🗑 {t ? t.historyClear : 'Clear'}
               </button>
             </div>
           )}
@@ -74,9 +74,9 @@ export default function History({ items, langCode, onClear, chatMode = false }) 
           {items.length === 0 ? (
             <div className="chat-empty">
               <div className="chat-empty-icon">💬</div>
-              <div>No messages yet.</div>
+              <div>{t ? t.historyEmpty : 'No messages yet.'}</div>
               <div style={{ fontSize: 13, marginTop: 4, opacity: 0.7 }}>
-                Tap a quick phrase above, or use the Voice / Text tabs.
+                {t ? t.historyEmptySub : 'Tap a quick phrase above, or use the Voice / Text tabs.'}
               </div>
             </div>
           ) : (
@@ -118,14 +118,14 @@ export default function History({ items, langCode, onClear, chatMode = false }) 
         </span>
         {items.length > 0 && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => downloadHistory(items)}>⬇ Download</button>
-            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={onClear}>Clear</button>
+            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => downloadHistory(items)}>⬇ {t ? t.historyDownload : 'Download'}</button>
+            <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={onClear}>{t ? t.historyClear : 'Clear'}</button>
           </div>
         )}
       </div>
       <div className="history-list">
         {items.length === 0 ? (
-          <div className="history-empty">No messages yet.</div>
+          <div className="history-empty">{t ? t.historyEmpty : 'No messages yet.'}</div>
         ) : (
           [...items].reverse().map((item, idx) => (
             <div key={idx} className="history-item" onClick={() => handleRepeat(item)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && handleRepeat(item)}>

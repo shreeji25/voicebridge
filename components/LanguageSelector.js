@@ -1,13 +1,13 @@
 // components/LanguageSelector.js
 // Displays language buttons for the user to choose the recognition/speech language.
 
-const LANGUAGES = [
-  { code: 'en-US', label: 'English',   flag: '🇺🇸', native: 'English'  },
-  { code: 'hi-IN', label: 'Hindi',     flag: '🇮🇳', native: 'हिंदी'    },
-  { code: 'gu-IN', label: 'Gujarati',  flag: '🇮🇳', native: 'ગુજરાતી'  },
-]
+export default function LanguageSelector({ selected, onChange, t }) {
+  const LANGUAGES = [
+    { code: 'en-US', label: t ? t.langEnglish  : 'English',  flag: '🇺🇸', native: 'English'  },
+    { code: 'hi-IN', label: t ? t.langHindi    : 'Hindi',    flag: '🇮🇳', native: 'हिंदी'    },
+    { code: 'gu-IN', label: t ? t.langGujarati : 'Gujarati', flag: '🇮🇳', native: 'ગુજરાતી'  },
+  ]
 
-export default function LanguageSelector({ selected, onChange }) {
   return (
     <div className="card">
       <div className="card-title">
@@ -33,5 +33,3 @@ export default function LanguageSelector({ selected, onChange }) {
     </div>
   )
 }
-
-export { LANGUAGES }
