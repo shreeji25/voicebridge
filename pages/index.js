@@ -1,9 +1,7 @@
-// pages/index.js — UPDATED with From/To multilingual setup
-// Adds first-time language configuration modal on launch
+// pages/index.js — FROM/TO single language selection with anytime switching
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import LanguageSetup from "../components/LanguageSetup"
-import LanguageSelector from "../components/LanguageSelector"
 import VoiceToText from "../components/VoiceToText"
 import TextToSpeech from "../components/TextToSpeech"
 import QuickPhrases from "../components/QuickPhrases"
@@ -11,60 +9,73 @@ import History from "../components/History"
 import HelpModal from "../components/HelpModal"
 import Settings from "../components/Settings"
 import { getT } from "../lib/translations"
+import { LANGUAGES } from "../lib/languages"
 
 export default function Home() {
-  // ── Language state (FROM/TO model) ──────────────────────────────────
+  // ── Language state ───────────────────────────────────────────────────
   const [fromLanguage, setFromLanguage] = useState("en-US")
-  const [toLanguages, setToLanguages] = useState(["en-US"])
+  const [toLanguage, setToLanguage]     = useState("hi-IN")
   const [showLanguageSetup, setShowLanguageSetup] = useState(false)
-  const [setupCompleted, setSetupCompleted] = useState(false)
+  const [setupCompleted, setSetupCompleted]       = useState(false)
 
-  // ── Other state ─────────────────────────────────────────────────────
-  const [tab, setTab] = useState("conversation")
-  const [history, setHistory] = useState([])
-  const [isOnline, setIsOnline] = useState(true)
-  const [largeText, setLargeText] = useState(false)
+  // ── Language dropdown state ─────────────────────────────────────────
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  // ── Other state ──────────────────────────────────────────────────────
+  const [tab, setTab]               = useState("conversation")
+  const [history, setHistory]       = useState([])
+  const [isOnline, setIsOnline]     = useState(true)
+  const [largeText, setLargeText]   = useState(false)
   const [highContrast, setHighContrast] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
+  const [helpOpen, setHelpOpen]     = useState(false)
   const [showBanner, setShowBanner] = useState(false)
-  const [theme, setTheme] = useState("dark")
+  const [theme, setTheme]           = useState("dark")
 
-  // ── Initialize from localStorage on mount ───────────────────────────
+  // ── Load from localStorage on mount ────────────────────────────────
   useEffect(() => {
-    const savedFromLang = localStorage.getItem("vb_fromLanguage")
-    const savedToLangs = localStorage.getItem("vb_toLanguages")
-    const setupDone = localStorage.getItem("vb_setupDone")
+    const savedFrom  = localStorage.getItem("vb_fromLanguage")
+    const savedTo    = localStorage.getItem("vb_toLanguage")
+    const setupDone  = localStorage.getItem("vb_setupDone")
 
     if (setupDone) {
       setSetupCompleted(true)
-      if (savedFromLang) setFromLanguage(savedFromLang)
-      if (savedToLangs) setToLanguages(JSON.parse(savedToLangs))
+      if (savedFrom) setFromLanguage(savedFrom)
+      if (savedTo)   setToLanguage(savedTo)
     } else {
-      // First time - show setup modal
       setShowLanguageSetup(true)
     }
 
-    // Other first-time checks
     if (!localStorage.getItem("vb_seen")) {
       setShowBanner(true)
       localStorage.setItem("vb_seen", "1")
     }
   }, [])
 
-  // ── Handle language setup confirmation ───────────────────────────────
-  function handleLanguageSetupConfirm({ fromLanguage: from, toLanguages: to }) {
+  // ── Close dropdown on outside click ────────────────────────────────
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // ── Confirm language setup/change ───────────────────────────────────
+  function handleLanguageSetupConfirm({ fromLanguage: from, toLanguage: to }) {
     setFromLanguage(from)
-    setToLanguages(to)
+    setToLanguage(to)
     setSetupCompleted(true)
     setShowLanguageSetup(false)
 
-    // Save to localStorage
     localStorage.setItem("vb_fromLanguage", from)
-    localStorage.setItem("vb_toLanguages", JSON.stringify(to))
+    localStorage.setItem("vb_toLanguage", to)
     localStorage.setItem("vb_setupDone", "1")
   }
 
-  // ── Apply accessibility classes ─────────────────────────────────────
+  // ── Accessibility & theme effects ───────────────────────────────────
   useEffect(() => {
     document.documentElement.classList.toggle("large-text", largeText)
   }, [largeText])
@@ -73,19 +84,18 @@ export default function Home() {
     document.documentElement.classList.toggle("high-contrast", highContrast)
   }, [highContrast])
 
-  // ── Apply theme ─────────────────────────────────────────────────────
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme)
   }, [theme])
 
-  // ── Online / offline banner ─────────────────────────────────────────
+  // ── Online / offline ─────────────────────────────────────────────────
   useEffect(() => {
-    const onOn = () => setIsOnline(true)
+    const onOn  = () => setIsOnline(true)
     const onOff = () => setIsOnline(false)
-    window.addEventListener("online", onOn)
+    window.addEventListener("online",  onOn)
     window.addEventListener("offline", onOff)
     return () => {
-      window.removeEventListener("online", onOn)
+      window.removeEventListener("online",  onOn)
       window.removeEventListener("offline", onOff)
     }
   }, [])
@@ -96,13 +106,18 @@ export default function Home() {
 
   const t = getT(fromLanguage)
 
-  // Don't show main UI until setup is complete
+  const fromLangObj = LANGUAGES.find(l => l.code === fromLanguage)
+  const toLangObj   = LANGUAGES.find(l => l.code === toLanguage)
+
+  // ── First-time setup screen ─────────────────────────────────────────
   if (!setupCompleted) {
     return (
       <div className="page">
         <LanguageSetup
           isOpen={showLanguageSetup}
           onConfirm={handleLanguageSetupConfirm}
+          initialFrom={fromLanguage}
+          initialTo={toLanguage}
         />
       </div>
     )
@@ -123,7 +138,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Header ───────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <header className="header">
         <div className="logo">
           <span className="logo-icon">🌉</span>
@@ -132,32 +147,77 @@ export default function Home() {
             <p className="logo-sub">{t.appSubtitle}</p>
           </div>
         </div>
-        <button className="help-pill" onClick={() => setHelpOpen(true)}>
-          {t.helpButton}
-        </button>
+
+        <div className="header-right">
+          {/* ── Language switcher dropdown ── */}
+          <div className="lang-switcher" ref={dropdownRef}>
+            <button
+              className="lang-switcher-btn"
+              onClick={() => setDropdownOpen(prev => !prev)}
+              aria-expanded={dropdownOpen}
+              title="Change languages"
+            >
+              <span className="ls-pair">
+                <span>{fromLangObj?.flag || '🌐'}</span>
+                <span className="ls-arrow">→</span>
+                <span>{toLangObj?.flag || '🌐'}</span>
+              </span>
+              <span className="ls-names">
+                {fromLangObj?.name || fromLanguage}
+                <span className="ls-sep"> → </span>
+                {toLangObj?.name || toLanguage}
+              </span>
+              <svg className={`ls-chevron ${dropdownOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="4,6 8,10 12,6" />
+              </svg>
+            </button>
+
+            {dropdownOpen && (
+              <div className="lang-switcher-dropdown">
+                <div className="lsd-header">Current languages</div>
+
+                <div className="lsd-current">
+                  <div className="lsd-current-row">
+                    <span className="lsd-label">SPEAKING</span>
+                    <span className="lsd-value">
+                      {fromLangObj?.flag} {fromLangObj?.name}
+                    </span>
+                  </div>
+                  <div className="lsd-divider">↓ translates to</div>
+                  <div className="lsd-current-row">
+                    <span className="lsd-label">OUTPUT</span>
+                    <span className="lsd-value">
+                      {toLangObj?.flag} {toLangObj?.name}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  className="lsd-change-btn"
+                  onClick={() => {
+                    setDropdownOpen(false)
+                    setShowLanguageSetup(true)
+                  }}
+                >
+                  🔄 Change Languages
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button className="help-pill" onClick={() => setHelpOpen(true)}>
+            {t.helpButton}
+          </button>
+        </div>
       </header>
 
-      {/* ── Current language display ───────────────────────────────── */}
-      {tab !== "settings" && (
-        <div className="current-lang-display">
-          <div className="lang-badge from-lang">
-            <span className="badge-label">From:</span>
-            <span className="badge-value">{fromLanguage}</span>
-          </div>
-          <div className="lang-badge to-langs">
-            <span className="badge-label">To:</span>
-            <span className="badge-value">{toLanguages.join(", ")}</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab bar ──────────────────────────────────────────────── */}
+      {/* ── Tab bar ──────────────────────────────────────────────────── */}
       <nav className="tab-bar">
         {[
           { key: "conversation", label: t.tabConversation },
-          { key: "tts", label: t.tabTextToSpeech },
-          { key: "vtt", label: t.tabVoiceToText },
-          { key: "settings", label: t.tabSettings },
+          { key: "tts",          label: t.tabTextToSpeech },
+          { key: "vtt",          label: t.tabVoiceToText  },
+          { key: "settings",     label: t.tabSettings     },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -169,7 +229,7 @@ export default function Home() {
         ))}
       </nav>
 
-      {/* ── Tab content ──────────────────────────────────────────── */}
+      {/* ── Tab content ──────────────────────────────────────────────── */}
       <main className="main">
         {tab === "conversation" && (
           <>
@@ -198,17 +258,12 @@ export default function Home() {
             highContrast={highContrast}
             onHighContrastChange={setHighContrast}
             fromLanguage={fromLanguage}
-            toLanguages={toLanguages}
-            onLanguageSettingsChange={(from, to) => {
-              setFromLanguage(from)
-              setToLanguages(to)
-              localStorage.setItem("vb_fromLanguage", from)
-              localStorage.setItem("vb_toLanguages", JSON.stringify(to))
-            }}
+            toLanguage={toLanguage}
+            onOpenLanguageSetup={() => setShowLanguageSetup(true)}
             onResetSetup={() => {
               localStorage.removeItem("vb_setupDone")
               localStorage.removeItem("vb_fromLanguage")
-              localStorage.removeItem("vb_toLanguages")
+              localStorage.removeItem("vb_toLanguage")
               setShowLanguageSetup(true)
               setSetupCompleted(false)
             }}
@@ -219,18 +274,20 @@ export default function Home() {
         )}
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────── */}
+      {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer className="footer">
         <p>{t.footerText}</p>
       </footer>
 
-      {/* ── Help modal ───────────────────────────────────────────── */}
+      {/* ── Help modal ───────────────────────────────────────────────── */}
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} t={t} />
 
-      {/* ── Language setup modal (shown on first launch or reset) ── */}
+      {/* ── Language setup modal ────────────────────────────────────── */}
       <LanguageSetup
         isOpen={showLanguageSetup}
         onConfirm={handleLanguageSetupConfirm}
+        initialFrom={fromLanguage}
+        initialTo={toLanguage}
       />
     </div>
   )

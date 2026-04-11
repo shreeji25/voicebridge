@@ -1,9 +1,11 @@
 // components/Settings.js
 // Props: history, onClearHistory, largeText, onLargeTextChange,
-//        highContrast, onHighContrastChange, langCode, theme, onThemeChange, t
+//        highContrast, onHighContrastChange, fromLanguage, toLanguage,
+//        onOpenLanguageSetup, onResetSetup, theme, onThemeChange, t
 
 import { useState, useEffect } from "react";
-import { getT } from "../translations";
+import { getT } from "../lib/translations";
+import { LANGUAGES } from "../lib/languages";
 
 export default function Settings({
   history = [],
@@ -12,12 +14,15 @@ export default function Settings({
   onLargeTextChange,
   highContrast,
   onHighContrastChange,
-  langCode = "en-US",
+  fromLanguage = "en-US",
+  toLanguage   = "hi-IN",
+  onOpenLanguageSetup,
+  onResetSetup,
   theme,
   onThemeChange,
   t: tProp,
 }) {
-  const t = tProp || getT(langCode);
+  const t = tProp || getT(fromLanguage);
 
   const [reduceMotion, setReduceMotion] = useState(false);
   const [fontSize, setFontSize]         = useState("medium");
@@ -25,7 +30,7 @@ export default function Settings({
   const [pitch, setPitch]               = useState(1.0);
   const [volume, setVolume]             = useState(100);
   const [micStatus, setMicStatus]       = useState("unknown");
-  const [openSection, setOpenSection]   = useState("appearance");
+  const [openSection, setOpenSection]   = useState("language");
   const [isOnline, setIsOnline]         = useState(
     typeof navigator !== "undefined" ? navigator.onLine : true
   );
@@ -37,6 +42,9 @@ export default function Settings({
   const [ttsSupported] = useState(
     () => typeof window !== "undefined" && "speechSynthesis" in window
   );
+
+  const fromLangObj = LANGUAGES.find(l => l.code === fromLanguage);
+  const toLangObj   = LANGUAGES.find(l => l.code === toLanguage);
 
   useEffect(() => {
     const on  = () => setIsOnline(true);
@@ -52,7 +60,7 @@ export default function Settings({
   function handleTestVoice() {
     if (!ttsSupported) return;
     const u = new SpeechSynthesisUtterance(t.settingsTestVoice || "Testing voice output");
-    u.lang = langCode; u.rate = rate; u.pitch = pitch; u.volume = volume / 100;
+    u.lang = fromLanguage; u.rate = rate; u.pitch = pitch; u.volume = volume / 100;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   }
@@ -87,8 +95,6 @@ export default function Settings({
 
   const micBadgeClass =
     micStatus === "granted" ? "badge-ok" : micStatus === "denied" ? "badge-fail" : "badge-warn";
-
-  // ── Reusable sub-components ──────────────────────────────────
 
   function SectionHeader({ sectionKey, icon, label }) {
     const isOpen = openSection === sectionKey;
@@ -144,7 +150,7 @@ export default function Settings({
   return (
     <div className="settings-page">
 
-      {/* Page header with online/offline badge */}
+      {/* Status badge */}
       <div className="sp-page-header">
         <h2 className="sp-page-title">{t.settingsTitle || "Settings"}</h2>
         <span className={`sp-status-badge${isOnline ? " online" : " offline"}`}>
@@ -153,7 +159,46 @@ export default function Settings({
         </span>
       </div>
 
-      {/* ── APPEARANCE ──────────────────────────────────────── */}
+      {/* ── LANGUAGE SETTINGS ─────────────────────────────────────── */}
+      <div className="sp-section">
+        <SectionHeader sectionKey="language" icon="🌐" label="Language Settings" />
+        {openSection === "language" && (
+          <div className="sp-body">
+            <div className="sp-lang-display">
+              <div className="sp-lang-row">
+                <div className="sp-lang-card">
+                  <span className="sp-lang-role">YOU SPEAK</span>
+                  <span className="sp-lang-flag">{fromLangObj?.flag || '🌐'}</span>
+                  <span className="sp-lang-name">{fromLangObj?.name || fromLanguage}</span>
+                  {fromLangObj?.nativeName !== fromLangObj?.name && (
+                    <span className="sp-lang-native">{fromLangObj?.nativeName}</span>
+                  )}
+                </div>
+                <div className="sp-lang-arrow">→</div>
+                <div className="sp-lang-card">
+                  <span className="sp-lang-role">OUTPUT IN</span>
+                  <span className="sp-lang-flag">{toLangObj?.flag || '🌐'}</span>
+                  <span className="sp-lang-name">{toLangObj?.name || toLanguage}</span>
+                  {toLangObj?.nativeName !== toLangObj?.name && (
+                    <span className="sp-lang-native">{toLangObj?.nativeName}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="sp-btn-row">
+              <button className="sp-action-btn" onClick={() => onOpenLanguageSetup?.()}>
+                🔄 Change Languages
+              </button>
+              <button className="sp-danger-btn" onClick={() => onResetSetup?.()}>
+                ↺ Reset &amp; Redo Setup
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── APPEARANCE ──────────────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="appearance" icon="☀️" label={t.settingsAppearance || "Appearance"} />
         {openSection === "appearance" && (
@@ -179,7 +224,7 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── ACCESSIBILITY ───────────────────────────────────── */}
+      {/* ── ACCESSIBILITY ────────────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="accessibility" icon="♿" label={t.settingsAccessibility || "Accessibility"} />
         {openSection === "accessibility" && (
@@ -209,7 +254,7 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── VOICE SETTINGS ──────────────────────────────────── */}
+      {/* ── VOICE SETTINGS ───────────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="voice" icon="🎙️" label={t.settingsVoice || "Voice settings"} />
         {openSection === "voice" && (
@@ -225,7 +270,7 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── CONVERSATION HISTORY ────────────────────────────── */}
+      {/* ── CONVERSATION HISTORY ──────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="history" icon="💬" label={t.settingsHistory || "Conversation history"} />
         {openSection === "history" && (
@@ -248,7 +293,7 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── BROWSER COMPATIBILITY ───────────────────────────── */}
+      {/* ── BROWSER COMPATIBILITY ─────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="compat" icon="🌐" label={t.settingsCompat || "Browser compatibility"} />
         {openSection === "compat" && (
@@ -276,7 +321,7 @@ export default function Settings({
         )}
       </div>
 
-      {/* ── ABOUT & PRIVACY ─────────────────────────────────── */}
+      {/* ── ABOUT & PRIVACY ───────────────────────────────────────────── */}
       <div className="sp-section">
         <SectionHeader sectionKey="about" icon="ℹ️" label={t.settingsAbout || "About & privacy"} />
         {openSection === "about" && (

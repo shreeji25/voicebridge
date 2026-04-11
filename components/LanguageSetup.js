@@ -1,194 +1,153 @@
 // components/LanguageSetup.js
-// First-time modal for selecting FROM and TO languages
-// Called on first launch or when user resets language preferences
+// Language setup modal — single FROM and single TO language selection
+// Used on first launch OR when user clicks "Change Language" anytime
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { LANGUAGES, getAllRegions } from '../lib/languages'
 import { getT } from '../lib/translations'
 
-export default function LanguageSetup({ isOpen, onConfirm }) {
-  const [fromLang, setFromLang] = useState('en-US')
-  const [toLanguages, setToLanguages] = useState(['en-US'])
-  const [showAllLanguages, setShowAllLanguages] = useState(false)
-  const [selectedRegion, setSelectedRegion] = useState(null)
-  const [step, setStep] = useState(1) // 1 or 2
+export default function LanguageSetup({ isOpen, onConfirm, initialFrom, initialTo }) {
+  const [fromLang, setFromLang] = useState(initialFrom || 'en-US')
+  const [toLang, setToLang] = useState(initialTo || 'hi-IN')
+  const [fromRegion, setFromRegion] = useState(null)
+  const [toRegion, setToRegion] = useState(null)
+  const [activePanel, setActivePanel] = useState('from') // 'from' or 'to'
 
-  const t = getT(fromLang) // Use fromLang for UI text preview
+  const t = getT(fromLang)
+  const regions = getAllRegions()
 
   if (!isOpen) return null
 
-  // Get languages for the current region or all languages
-  const displayLanguages = selectedRegion
-    ? LANGUAGES.filter(lang => lang.region === selectedRegion)
+  const fromLanguages = fromRegion
+    ? LANGUAGES.filter(l => l.region === fromRegion)
     : LANGUAGES
 
-  const regions = getAllRegions()
+  const toLanguages = toRegion
+    ? LANGUAGES.filter(l => l.region === toRegion)
+    : LANGUAGES
 
-  function handleToLanguageToggle(code) {
-    setToLanguages(prev => {
-      if (prev.includes(code)) {
-        return prev.filter(l => l !== code)
-      } else {
-        return [...prev, code]
-      }
-    })
-  }
+  const fromLangObj = LANGUAGES.find(l => l.code === fromLang)
+  const toLangObj   = LANGUAGES.find(l => l.code === toLang)
 
   function handleConfirm() {
-    if (toLanguages.length === 0) {
-      alert('Please select at least one output language')
-      return
-    }
-    onConfirm({
-      fromLanguage: fromLang,
-      toLanguages: toLanguages,
-    })
+    onConfirm({ fromLanguage: fromLang, toLanguage: toLang })
   }
 
   return (
-    <div className="language-setup-backdrop">
-      <div className="language-setup-modal">
+    <div className="lsu-backdrop">
+      <div className="lsu-modal">
+
         {/* Header */}
-        <div className="language-setup-header">
-          <h2>{t.setupTitle}</h2>
-          <p>{t.setupSubtitle}</p>
+        <div className="lsu-header">
+          <div className="lsu-header-icon">🌐</div>
+          <h2>Choose Languages</h2>
+          <p>Select the language you speak and the language you want</p>
         </div>
 
-        {/* Progress indicator */}
-        <div className="setup-progress">
-          <div className={`progress-dot ${step === 1 ? 'active' : 'completed'}`}>1</div>
-          <div className={`progress-line ${step === 2 ? 'active' : ''}`}></div>
-          <div className={`progress-dot ${step === 2 ? 'active' : ''}`}>2</div>
+        {/* Selected pair preview */}
+        <div className="lsu-pair-preview">
+          <button
+            className={`lsu-pair-card ${activePanel === 'from' ? 'active' : ''}`}
+            onClick={() => setActivePanel('from')}
+          >
+            <span className="lsu-pair-label">YOU SPEAK</span>
+            <span className="lsu-pair-flag">{fromLangObj?.flag || '🌐'}</span>
+            <span className="lsu-pair-name">{fromLangObj?.name || 'Select'}</span>
+          </button>
+
+          <div className="lsu-pair-arrow">→</div>
+
+          <button
+            className={`lsu-pair-card ${activePanel === 'to' ? 'active' : ''}`}
+            onClick={() => setActivePanel('to')}
+          >
+            <span className="lsu-pair-label">TRANSLATE TO</span>
+            <span className="lsu-pair-flag">{toLangObj?.flag || '🌐'}</span>
+            <span className="lsu-pair-name">{toLangObj?.name || 'Select'}</span>
+          </button>
         </div>
 
-        {/* Step 1: FROM Language */}
-        {step === 1 && (
-          <div className="setup-step">
-            <label className="setup-step-label">{t.setupStep1}</label>
-            <p className="setup-step-desc">{t.setupStep1Desc}</p>
+        {/* Panel: FROM */}
+        {activePanel === 'from' && (
+          <div className="lsu-panel">
+            <div className="lsu-panel-title">Select your speaking language</div>
 
-            {/* Region filter */}
-            <div className="region-filter">
+            <div className="lsu-region-filter">
               <button
-                className={`region-btn ${selectedRegion === null ? 'active' : ''}`}
-                onClick={() => setSelectedRegion(null)}
-              >
-                {t.setupShowAll}
-              </button>
-              {regions.map(region => (
+                className={`lsu-region-btn ${fromRegion === null ? 'active' : ''}`}
+                onClick={() => setFromRegion(null)}
+              >All</button>
+              {regions.map(r => (
                 <button
-                  key={region}
-                  className={`region-btn ${selectedRegion === region ? 'active' : ''}`}
-                  onClick={() => setSelectedRegion(region)}
-                >
-                  {region}
-                </button>
+                  key={r}
+                  className={`lsu-region-btn ${fromRegion === r ? 'active' : ''}`}
+                  onClick={() => setFromRegion(r)}
+                >{r}</button>
               ))}
             </div>
 
-            {/* Language grid */}
-            <div className="language-grid">
-              {displayLanguages.map(lang => (
+            <div className="lsu-lang-grid">
+              {fromLanguages.map(lang => (
                 <button
                   key={lang.code}
-                  className={`language-btn ${fromLang === lang.code ? 'selected' : ''}`}
-                  onClick={() => setFromLang(lang.code)}
+                  className={`lsu-lang-btn ${fromLang === lang.code ? 'selected' : ''}`}
+                  onClick={() => { setFromLang(lang.code); setActivePanel('to') }}
                 >
-                  <span className="lang-flag">{lang.flag}</span>
-                  <span className="lang-name">{lang.name}</span>
+                  <span className="lsu-flag">{lang.flag}</span>
+                  <span className="lsu-name">{lang.name}</span>
                   {lang.nativeName !== lang.name && (
-                    <span className="lang-native">{lang.nativeName}</span>
+                    <span className="lsu-native">{lang.nativeName}</span>
                   )}
-                  {fromLang === lang.code && <span className="checkmark">✓</span>}
+                  {fromLang === lang.code && <span className="lsu-check">✓</span>}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Step 2: TO Languages */}
-        {step === 2 && (
-          <div className="setup-step">
-            <label className="setup-step-label">{t.setupStep2}</label>
-            <p className="setup-step-desc">{t.setupStep2Desc}</p>
-            <p className="setup-tip">{t.setupTip}</p>
+        {/* Panel: TO */}
+        {activePanel === 'to' && (
+          <div className="lsu-panel">
+            <div className="lsu-panel-title">Select translation language</div>
 
-            {/* Region filter */}
-            <div className="region-filter">
+            <div className="lsu-region-filter">
               <button
-                className={`region-btn ${selectedRegion === null ? 'active' : ''}`}
-                onClick={() => setSelectedRegion(null)}
-              >
-                {t.setupShowAll}
-              </button>
-              {regions.map(region => (
+                className={`lsu-region-btn ${toRegion === null ? 'active' : ''}`}
+                onClick={() => setToRegion(null)}
+              >All</button>
+              {regions.map(r => (
                 <button
-                  key={region}
-                  className={`region-btn ${selectedRegion === region ? 'active' : ''}`}
-                  onClick={() => setSelectedRegion(region)}
-                >
-                  {region}
-                </button>
+                  key={r}
+                  className={`lsu-region-btn ${toRegion === r ? 'active' : ''}`}
+                  onClick={() => setToRegion(r)}
+                >{r}</button>
               ))}
             </div>
 
-            {/* Language grid with multi-select */}
-            <div className="language-grid">
-              {displayLanguages.map(lang => (
+            <div className="lsu-lang-grid">
+              {toLanguages.map(lang => (
                 <button
                   key={lang.code}
-                  className={`language-btn ${toLanguages.includes(lang.code) ? 'selected' : ''}`}
-                  onClick={() => handleToLanguageToggle(lang.code)}
+                  className={`lsu-lang-btn ${toLang === lang.code ? 'selected' : ''}`}
+                  onClick={() => setToLang(lang.code)}
                 >
-                  <span className="lang-flag">{lang.flag}</span>
-                  <span className="lang-name">{lang.name}</span>
+                  <span className="lsu-flag">{lang.flag}</span>
+                  <span className="lsu-name">{lang.name}</span>
                   {lang.nativeName !== lang.name && (
-                    <span className="lang-native">{lang.nativeName}</span>
+                    <span className="lsu-native">{lang.nativeName}</span>
                   )}
-                  {toLanguages.includes(lang.code) && <span className="checkmark">✓</span>}
+                  {toLang === lang.code && <span className="lsu-check">✓</span>}
                 </button>
               ))}
-            </div>
-
-            {/* Selected count */}
-            <div className="selected-count">
-              {toLanguages.length} language{toLanguages.length !== 1 ? 's' : ''} selected
             </div>
           </div>
         )}
 
-        {/* Buttons */}
-        <div className="setup-buttons">
-          {step === 2 && (
-            <button
-              className="btn-secondary"
-              onClick={() => setStep(1)}
-            >
-              ← Back
-            </button>
-          )}
-          {step === 1 && (
-            <button
-              className="btn-primary"
-              onClick={() => setStep(2)}
-            >
-              Next →
-            </button>
-          )}
-          {step === 2 && (
-            <button
-              className="btn-primary"
-              onClick={handleConfirm}
-            >
-              {t.setupConfirm}
-            </button>
-          )}
-        </div>
+        {/* Confirm button */}
+        <button className="lsu-confirm-btn" onClick={handleConfirm}>
+          ✓ Confirm — {fromLangObj?.flag} {fromLangObj?.name} → {toLangObj?.flag} {toLangObj?.name}
+        </button>
 
-        {/* Footer note */}
-        <p className="setup-footer-note">
-          💡 You can change these settings anytime in Settings → Language Settings
-        </p>
       </div>
     </div>
   )
