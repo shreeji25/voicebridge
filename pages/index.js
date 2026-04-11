@@ -244,10 +244,10 @@ export default function Home() {
           </>
         )}
         {tab === "tts" && (
-          <TextToSpeech langCode={fromLanguage} onAddToHistory={addToHistory} t={t} />
+          <TextToSpeech langCode={fromLanguage} toLanguage={toLanguage} onAddToHistory={addToHistory} t={t} />
         )}
         {tab === "vtt" && (
-          <VoiceToText langCode={fromLanguage} onAddToHistory={addToHistory} t={t} />
+          <VoiceToText langCode={fromLanguage} toLanguage={toLanguage} onAddToHistory={addToHistory} t={t} />
         )}
         {tab === "settings" && (
           <Settings

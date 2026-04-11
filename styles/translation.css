@@ -1,0 +1,122 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   TRANSLATION UI — TextToSpeech & VoiceToText components
+   Add these rules to your globals.css (or a new translation.css imported in _app.js)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Language direction bar (shown above cards when FROM ≠ TO) ──────── */
+.tts-lang-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 212, 255, 0.06);
+  border: 0.5px solid var(--border-hi);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  font-size: 13px;
+}
+
+.tts-lang-from { color: var(--text-muted); }
+.tts-lang-arrow { color: var(--accent); font-weight: 700; font-size: 16px; }
+.tts-lang-to   { color: var(--text); }
+.tts-lang-from strong,
+.tts-lang-to   strong { color: var(--accent); font-weight: 600; }
+
+/* ── Translation preview box (TTS — shows translated text before speaking) */
+.tts-translation-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-inset);
+  border: 0.5px solid var(--border-hi);
+  border-left: 3px solid var(--accent2, #a78bfa);
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+.tts-preview-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent2, #a78bfa);
+}
+
+.tts-preview-text {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+/* ── Quick phrase note ───────────────────────────────────────────────── */
+.tts-quick-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+/* ── Error note ──────────────────────────────────────────────────────── */
+.tts-error-note {
+  font-size: 12px;
+  color: #f87171;
+  padding: 0.5rem 0.75rem;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 6px;
+  border-left: 3px solid #f87171;
+  margin-top: 0.5rem;
+}
+
+/* ── VoiceToText: section label inside transcript box ───────────────── */
+.vtt-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+/* ── VoiceToText: translation output box ────────────────────────────── */
+.vtt-translation-box {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-inset);
+  border: 0.5px solid var(--border-hi);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vtt-translation-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.vtt-translation-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ── Usage hint at the bottom of VTT ────────────────────────────────── */
+.vtt-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.85rem;
+  background: var(--bg-inset);
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.vtt-hint strong { color: var(--accent); }

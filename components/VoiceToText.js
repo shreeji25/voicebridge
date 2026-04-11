@@ -1,17 +1,26 @@
 // components/VoiceToText.js
-// This component lets the user speak, converts speech to text using the browser's
-// SpeechRecognition API, and displays the transcribed text live.
+// User SPEAKS in fromLang → speech is transcribed → TRANSLATED to toLanguage
+// → translated text displayed + read aloud in toLanguage
+// Perfect for mute/hard-of-hearing users communicating across language barriers
 
 import { useState, useCallback } from 'react'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { useSpeechSynthesis }   from '../hooks/useSpeechSynthesis'
+import { translateText }        from '../lib/translate'
 
-export default function VoiceToText({ langCode, onAddToHistory, t }) {
-  const [finalText, setFinalText] = useState('')
+export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t }) {
+  const [originalText, setOriginalText]     = useState('')
+  const [translatedText, setTranslatedText] = useState('')
+  const [isTranslating, setIsTranslating]   = useState(false)
+  const [translationError, setTranslationError] = useState('')
 
-  // Called when the recognition engine gives us a confirmed result
+  const outputLang   = toLanguage || langCode
+  const sameLanguage = langCode?.split('-')[0] === outputLang?.split('-')[0]
+
+  // Called when speech recognition gives a confirmed result
   const handleResult = useCallback((text) => {
-    setFinalText(prev => prev ? `${prev} ${text}` : text)
+    setOriginalText(prev => prev ? `${prev} ${text}` : text)
+    setTranslatedText('')  // clear old translation when new speech comes in
   }, [])
 
   const { isListening, interimText, error, isSupported, startListening, stopListening } =
@@ -19,21 +28,53 @@ export default function VoiceToText({ langCode, onAddToHistory, t }) {
 
   const { isSpeaking, speak, cancel } = useSpeechSynthesis()
 
-  // Speak the transcribed text back aloud (useful for mute users to confirm what was captured)
-  const handleSpeak = () => {
-    if (!finalText.trim()) return
-    speak({ text: finalText, lang: langCode })
-    onAddToHistory?.({ text: finalText, type: 'voice', lang: langCode })
+  // Translate the transcribed text then read aloud in output language
+  async function handleTranslateAndSpeak() {
+    if (!originalText.trim()) return
+    setTranslationError('')
+    setIsTranslating(true)
+
+    try {
+      const translated = sameLanguage
+        ? originalText
+        : await translateText(originalText, langCode, outputLang)
+
+      setTranslatedText(translated)
+      speak({ text: translated, lang: outputLang })
+
+      onAddToHistory?.({
+        text: sameLanguage ? originalText : `${originalText} → ${translated}`,
+        type: 'voice',
+        lang: langCode,
+        translatedLang: outputLang,
+      })
+    } catch (err) {
+      setTranslationError('Translation failed. Reading original text.')
+      speak({ text: originalText, lang: langCode })
+    } finally {
+      setIsTranslating(false)
+    }
   }
 
-  const handleClear = () => {
+  // Read already-translated text aloud again (without re-translating)
+  function handleReadAgain() {
+    const textToSpeak = translatedText || originalText
+    const langToUse   = translatedText ? outputLang : langCode
+    if (!textToSpeak) return
+    speak({ text: textToSpeak, lang: langToUse })
+  }
+
+  function handleClear() {
     stopListening()
     cancel()
-    setFinalText('')
+    setOriginalText('')
+    setTranslatedText('')
+    setTranslationError('')
   }
 
-  const handleCopy = () => {
-    if (finalText) navigator.clipboard?.writeText(finalText)
+  function handleCopy() {
+    const textToCopy = translatedText || originalText
+    if (textToCopy) navigator.clipboard?.writeText(textToCopy)
   }
 
   if (!isSupported) {
@@ -49,26 +90,33 @@ export default function VoiceToText({ langCode, onAddToHistory, t }) {
       {/* Error display */}
       {error && (
         <div className="error-banner" role="alert">
-          <span>⚠️</span>
-          <span>{error}</span>
+          <span>⚠️</span><span>{error}</span>
+        </div>
+      )}
+
+      {/* Translation direction bar */}
+      {!sameLanguage && (
+        <div className="tts-lang-bar">
+          <span className="tts-lang-from">🎤 Speak in <strong>{langCode}</strong></span>
+          <span className="tts-lang-arrow">→</span>
+          <span className="tts-lang-to">🌐 Translated to <strong>{outputLang}</strong></span>
         </div>
       )}
 
       <div className="card">
-        <div className="card-title"><span>🎤</span> Voice → Text</div>
+        <div className="card-title"><span>🎤</span> Voice → Text{!sameLanguage ? ' → Translation' : ''}</div>
 
-        {/* Microphone button with pulse animation when active */}
+        {/* Mic button */}
         <div className="mic-section">
           <button
             className={`mic-btn ${isListening ? 'listening' : ''}`}
             onClick={isListening ? stopListening : startListening}
-            aria-label={isListening ? (t ? t.vttStopListening : 'Stop listening') : (t ? t.vttStartListening : 'Start listening')}
+            aria-label={isListening ? 'Stop listening' : 'Start listening'}
             title={isListening ? 'Click to stop' : 'Click to start speaking'}
           >
             {isListening ? '⏹️' : '🎤'}
           </button>
 
-          {/* Sound wave animation — shown only while listening */}
           <div className={`wave-container ${isListening ? 'visible' : ''}`}>
             {[...Array(7)].map((_, i) => (
               <div key={i} className="wave-bar" />
@@ -76,27 +124,31 @@ export default function VoiceToText({ langCode, onAddToHistory, t }) {
           </div>
 
           <div className={`mic-label ${isListening ? 'active' : ''}`}>
-            {isListening ? (t ? t.vttListeningLabel : '🔴 Listening… speak now') : (t ? t.vttIdleLabel : 'Click the mic to start speaking')}
+            {isListening
+              ? (t?.vttListeningLabel || `🔴 Listening in ${langCode}… speak now`)
+              : (t?.vttIdleLabel     || 'Click the mic to start speaking')}
           </div>
         </div>
 
         <div className="divider" />
 
-        {/* Live transcript display */}
+        {/* Original transcription */}
         <div
-          className={`transcript-box ${finalText || interimText ? 'has-text' : ''}`}
+          className={`transcript-box ${originalText || interimText ? 'has-text' : ''}`}
           role="region"
-          aria-label="Transcription output"
+          aria-label="Original transcription"
           aria-live="polite"
         >
-          {!finalText && !interimText ? (
+          {!originalText && !interimText ? (
             <div className="transcript-placeholder">
-              {t ? t.vttPlaceholder : 'Your spoken words will appear here in real time…'}
+              {t?.vttPlaceholder || 'Your spoken words will appear here…'}
             </div>
           ) : (
             <>
-              <span className="final-text">{finalText}</span>
-              {/* Interim text is shown greyed out while the engine is still processing */}
+              <div className="vtt-section-label">
+                {sameLanguage ? 'Transcription' : `Original (${langCode})`}
+              </div>
+              <span className="final-text">{originalText}</span>
               {interimText && (
                 <span className="interim-text"> {interimText}</span>
               )}
@@ -104,40 +156,81 @@ export default function VoiceToText({ langCode, onAddToHistory, t }) {
           )}
         </div>
 
+        {/* Translated output — shown after translation */}
+        {!sameLanguage && (translatedText || isTranslating) && (
+          <div className="vtt-translation-box">
+            <div className="vtt-translation-label">
+              {isTranslating
+                ? '⏳ Translating…'
+                : `🌐 Translation (${outputLang})`}
+            </div>
+            {!isTranslating && (
+              <div className="vtt-translation-text">{translatedText}</div>
+            )}
+          </div>
+        )}
+
+        {translationError && (
+          <div className="tts-error-note">⚠️ {translationError}</div>
+        )}
+
         {/* Action buttons */}
         <div className="btn-row" style={{ marginTop: 16 }}>
+          {/* Primary action: translate then speak */}
           <button
             className="btn btn-primary"
-            onClick={handleSpeak}
-            disabled={!finalText || isSpeaking}
-            title="Read the transcribed text aloud"
+            onClick={handleTranslateAndSpeak}
+            disabled={!originalText || isSpeaking || isTranslating}
+            title={sameLanguage ? 'Read aloud' : 'Translate and read aloud in output language'}
           >
-            {isSpeaking ? '🔊 Speaking…' : '🔊 Read Aloud'}
+            {isTranslating
+              ? '⏳ Translating…'
+              : isSpeaking
+              ? '🔊 Speaking…'
+              : sameLanguage
+              ? '🔊 Read Aloud'
+              : '🌐 Translate & Read Aloud'}
           </button>
 
-          {isSpeaking && (
-            <button className="btn btn-danger" onClick={cancel}>
-              ⏹ Stop
+          {/* Re-read already translated text */}
+          {translatedText && !isSpeaking && (
+            <button
+              className="btn btn-secondary"
+              onClick={handleReadAgain}
+              title="Read the translation aloud again"
+            >
+              🔁 Read Again
             </button>
+          )}
+
+          {isSpeaking && (
+            <button className="btn btn-danger" onClick={cancel}>⏹ Stop</button>
           )}
 
           <button
             className="btn btn-secondary"
             onClick={handleCopy}
-            disabled={!finalText}
-            title="Copy text to clipboard"
+            disabled={!originalText && !translatedText}
+            title={translatedText ? 'Copy translated text' : 'Copy transcribed text'}
           >
-            📋 Copy
+            📋 {translatedText ? 'Copy Translation' : 'Copy'}
           </button>
 
           <button
             className="btn btn-secondary"
             onClick={handleClear}
-            disabled={!finalText && !interimText}
+            disabled={!originalText && !interimText}
           >
             🗑 Clear
           </button>
         </div>
+
+        {/* Usage hint */}
+        {!sameLanguage && !originalText && (
+          <p className="vtt-hint">
+            💡 Speak in <strong>{langCode}</strong> — the app will translate and read it aloud in <strong>{outputLang}</strong> for the other person.
+          </p>
+        )}
       </div>
     </div>
   )
