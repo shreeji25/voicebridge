@@ -8,7 +8,7 @@ import QuickPhrases from "../components/QuickPhrases"
 import History from "../components/History"
 import HelpModal from "../components/HelpModal"
 import Settings from "../components/Settings"
-import { getT } from "../lib/translations"
+import { getT, preloadTranslation, onTranslationReady } from "../lib/translations"
 import { LANGUAGES } from "../lib/languages"
 
 export default function Home() {
@@ -17,6 +17,8 @@ export default function Home() {
   const [toLanguage, setToLanguage]     = useState("hi-IN")
   const [showLanguageSetup, setShowLanguageSetup] = useState(false)
   const [setupCompleted, setSetupCompleted]       = useState(false)
+  // Forces re-render when auto-translation finishes for unlisted languages
+  const [translationKey, setTranslationKey] = useState(0)
 
   // ── Language dropdown state ─────────────────────────────────────────
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -52,6 +54,23 @@ export default function Home() {
     }
   }, [])
 
+  // ── Subscribe to auto-translation completion ────────────────────────
+  // When user picks a language not in manual list, auto-translation runs
+  // in background. When it finishes, we force a re-render so UI updates.
+  useEffect(() => {
+    const unsub = onTranslationReady((langCode) => {
+      if (langCode === fromLanguage) {
+        setTranslationKey(k => k + 1)
+      }
+    })
+    return unsub
+  }, [fromLanguage])
+
+  // ── Preload translation when from-language changes ──────────────────
+  useEffect(() => {
+    preloadTranslation(fromLanguage)
+  }, [fromLanguage])
+
   // ── Close dropdown on outside click ────────────────────────────────
   useEffect(() => {
     function handleClickOutside(e) {
@@ -73,6 +92,9 @@ export default function Home() {
     localStorage.setItem("vb_fromLanguage", from)
     localStorage.setItem("vb_toLanguage", to)
     localStorage.setItem("vb_setupDone", "1")
+
+    // Start preloading translation for chosen language immediately
+    preloadTranslation(from)
   }
 
   // ── Accessibility & theme effects ───────────────────────────────────
@@ -104,7 +126,9 @@ export default function Home() {
     setHistory((prev) => [item, ...prev])
   }
 
-  const t = getT(fromLanguage)
+  // translationKey causes this to re-run when auto-translation completes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const t = getT(fromLanguage)  // re-derives on translationKey change via render
 
   const fromLangObj = LANGUAGES.find(l => l.code === fromLanguage)
   const toLangObj   = LANGUAGES.find(l => l.code === toLanguage)
