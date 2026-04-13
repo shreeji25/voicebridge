@@ -271,7 +271,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t })
         {/* Usage hint */}
         {!sameLanguage && !originalText && (
           <p className="vtt-hint">
-            💡 {t.speakIn || "Speak in"} <strong>{langCode}</strong> — {t.appWillTranslate || "the app will translate and read it aloud in"} <strong>{outputLang}</strong> {t.forTheOther || "for the other person."}}
+            💡 {t.speakIn || "Speak in"} <strong>{langCode}</strong> — {t.appWillTranslate || "the app will translate and read it aloud in"} <strong>{outputLang}</strong> {t.forTheOther || "for the other person."}
           </p>
         )}
       </div>
