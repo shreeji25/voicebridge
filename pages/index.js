@@ -1,4 +1,5 @@
 // pages/index.js — FROM/TO single language selection with anytime switching
+// FIXED: Proper translation updates when language changes, supports 40+ languages
 
 import { useState, useEffect, useRef } from "react"
 import LanguageSetup from "../components/LanguageSetup"
@@ -19,6 +20,7 @@ export default function Home() {
   const [setupCompleted, setSetupCompleted]       = useState(false)
   // Forces re-render when auto-translation finishes for unlisted languages
   const [translationKey, setTranslationKey] = useState(0)
+  const [translationLoading, setTranslationLoading] = useState(false)
 
   // ── Language dropdown state ─────────────────────────────────────────
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -60,6 +62,7 @@ export default function Home() {
   useEffect(() => {
     const unsub = onTranslationReady((langCode) => {
       if (langCode === fromLanguage) {
+        setTranslationLoading(false)
         setTranslationKey(k => k + 1)
       }
     })
@@ -68,6 +71,7 @@ export default function Home() {
 
   // ── Preload translation when from-language changes ──────────────────
   useEffect(() => {
+    setTranslationLoading(true)
     preloadTranslation(fromLanguage)
   }, [fromLanguage])
 
@@ -94,6 +98,7 @@ export default function Home() {
     localStorage.setItem("vb_setupDone", "1")
 
     // Start preloading translation for chosen language immediately
+    setTranslationLoading(true)
     preloadTranslation(from)
   }
 
@@ -126,9 +131,9 @@ export default function Home() {
     setHistory((prev) => [item, ...prev])
   }
 
-  // translationKey causes this to re-run when auto-translation completes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const t = getT(fromLanguage)  // re-derives on translationKey change via render
+  // Re-derive translations whenever fromLanguage or translationKey changes
+  // This ensures UI updates immediately when language changes
+  const t = getT(fromLanguage)
 
   const fromLangObj = LANGUAGES.find(l => l.code === fromLanguage)
   const toLangObj   = LANGUAGES.find(l => l.code === toLanguage)
@@ -162,6 +167,13 @@ export default function Home() {
         </div>
       )}
 
+      {/* ── Translation loading indicator ────────────────────────────── */}
+      {translationLoading && (
+        <div className="translation-loading-banner">
+          ⏳ {t.translationLoading || "Loading translations for selected language..."}
+        </div>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────────── */}
       <header className="header">
         <div className="logo">
@@ -179,7 +191,7 @@ export default function Home() {
               className="lang-switcher-btn"
               onClick={() => setDropdownOpen(prev => !prev)}
               aria-expanded={dropdownOpen}
-              title="Change languages"
+              title={t.changeLangs || "Change languages"}
             >
               <span className="ls-pair">
                 <span>{fromLangObj?.flag || '🌐'}</span>
@@ -198,18 +210,18 @@ export default function Home() {
 
             {dropdownOpen && (
               <div className="lang-switcher-dropdown">
-                <div className="lsd-header">Current languages</div>
+                <div className="lsd-header">{t.currentLanguages || "Current languages"}</div>
 
                 <div className="lsd-current">
                   <div className="lsd-current-row">
-                    <span className="lsd-label">SPEAKING</span>
+                    <span className="lsd-label">{t.speaking || "SPEAKING"}</span>
                     <span className="lsd-value">
                       {fromLangObj?.flag} {fromLangObj?.name}
                     </span>
                   </div>
-                  <div className="lsd-divider">↓ translates to</div>
+                  <div className="lsd-divider">↓ {t.translatesTo || "translates to"}</div>
                   <div className="lsd-current-row">
-                    <span className="lsd-label">OUTPUT</span>
+                    <span className="lsd-label">{t.output || "OUTPUT"}</span>
                     <span className="lsd-value">
                       {toLangObj?.flag} {toLangObj?.name}
                     </span>
@@ -223,7 +235,7 @@ export default function Home() {
                     setShowLanguageSetup(true)
                   }}
                 >
-                  🔄 Change Languages
+                  🔄 {t.changeLanguages || "Change Languages"}
                 </button>
               </div>
             )}
@@ -239,8 +251,8 @@ export default function Home() {
       <nav className="tab-bar">
         {[
           { key: "conversation", label: t.tabConversation },
-          { key: "tts",          label: t.tabTextToSpeech },
-          { key: "vtt",          label: t.tabVoiceToText  },
+          { key: "tts",          label: t.tabWriting },
+          { key: "vtt",          label: t.tabSpeaking  },
           { key: "settings",     label: t.tabSettings     },
         ].map(({ key, label }) => (
           <button
@@ -268,10 +280,22 @@ export default function Home() {
           </>
         )}
         {tab === "tts" && (
-          <TextToSpeech langCode={fromLanguage} toLanguage={toLanguage} onAddToHistory={addToHistory} t={t} />
+          <TextToSpeech 
+            langCode={fromLanguage} 
+            toLanguage={toLanguage} 
+            onAddToHistory={addToHistory} 
+            t={t}
+            key={`tts-${fromLanguage}-${toLanguage}`}
+          />
         )}
         {tab === "vtt" && (
-          <VoiceToText langCode={fromLanguage} toLanguage={toLanguage} onAddToHistory={addToHistory} t={t} />
+          <VoiceToText 
+            langCode={fromLanguage} 
+            toLanguage={toLanguage} 
+            onAddToHistory={addToHistory} 
+            t={t}
+            key={`vtt-${fromLanguage}-${toLanguage}`}
+          />
         )}
         {tab === "settings" && (
           <Settings
