@@ -1,13 +1,14 @@
 // components/TextToSpeech.js
 // User TYPES in their language (fromLang) → text is TRANSLATED → spoken in toLanguage
 // Designed for mute users who want to communicate with people who speak a different language
-// FIXED: Proper translation updates, working speak functionality, user-friendly labels
+// FIXED: Quick phrases now display in FROM language (user's native language)
 
 import { useState, useEffect } from 'react'
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis'
 import { translateText } from '../lib/translate'
 
-const QUICK_PHRASES_EN = [
+// Base English phrases - will be translated to user's FROM language for display
+const QUICK_PHRASES_BASE = [
   { emoji: '👋', text: 'Hello, how are you?' },
   { emoji: '🙏', text: 'Thank you very much.' },
   { emoji: '🆘', text: 'I need help please.' },
@@ -29,7 +30,8 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
   const [pitch, setPitch]                 = useState(1)
   const [isTranslating, setIsTranslating] = useState(false)
   const [translationError, setTranslationError] = useState('')
-  const [quickPhrasesTranslated, setQuickPhrasesTranslated] = useState(QUICK_PHRASES_EN)
+  // Quick phrases: displayed in FROM language, with audio in output language
+  const [quickPhrasesTranslated, setQuickPhrasesTranslated] = useState(QUICK_PHRASES_BASE)
 
   const { isSpeaking, isSupported, speak, cancel } = useSpeechSynthesis()
 
@@ -37,30 +39,37 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
   const outputLang = toLanguage || langCode
   const sameLanguage = langCode?.split('-')[0] === outputLang?.split('-')[0]
 
-  // ── Translate quick phrases when languages change ──────────────────
+  // ── Translate quick phrases to FROM language (user's native language) ──
+  // Phrases display in user's language, but speak in output language
   useEffect(() => {
     async function translateQuickPhrases() {
-      if (sameLanguage) {
-        setQuickPhrasesTranslated(QUICK_PHRASES_EN)
+      if (langCode === 'en-US') {
+        // If user's language is English, no translation needed
+        setQuickPhrasesTranslated(QUICK_PHRASES_BASE)
         return
       }
 
       try {
         const translated = await Promise.all(
-          QUICK_PHRASES_EN.map(async (p) => ({
+          QUICK_PHRASES_BASE.map(async (p) => ({
             ...p,
-            translatedText: await translateText(p.text, 'en-US', outputLang)
+            // Translate base English phrase to user's FROM language (for display)
+            displayText: await translateText(p.text, 'en-US', langCode),
+            // Also get version for speaking (may differ from display)
+            speakText: toLanguage && !sameLanguage 
+              ? await translateText(p.text, 'en-US', toLanguage)
+              : await translateText(p.text, 'en-US', langCode)
           }))
         )
         setQuickPhrasesTranslated(translated)
       } catch (err) {
         console.error('Quick phrases translation failed:', err)
-        setQuickPhrasesTranslated(QUICK_PHRASES_EN)
+        setQuickPhrasesTranslated(QUICK_PHRASES_BASE)
       }
     }
 
     translateQuickPhrases()
-  }, [outputLang, sameLanguage])
+  }, [langCode, toLanguage, sameLanguage])
 
   // Translate then speak
   async function handleSpeak() {
@@ -108,22 +117,17 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
     }
   }
 
-  // Quick phrases: translate then speak
+  // Quick phrases: user clicks phrase shown in their FROM language
+  // then it gets translated to output language and spoken
   async function handleQuickPhrase(phrase) {
-    setText(phrase)
+    setText(phrase.displayText || phrase.text)
     setTranslationError('')
     setIsTranslating(true)
 
     try {
-      let textToSpeak = phrase
-      let translatedForDisplay = phrase
+      let textToSpeak = phrase.speakText || phrase.displayText || phrase.text
 
-      if (!sameLanguage) {
-        translatedForDisplay = await translateText(phrase, 'en-US', outputLang)
-        textToSpeak = translatedForDisplay
-      }
-
-      setTranslatedText(translatedForDisplay)
+      setTranslatedText(textToSpeak)
       
       try {
         speak({ text: textToSpeak, lang: outputLang, rate, pitch })
@@ -132,9 +136,11 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
       }
 
       onAddToHistory?.({
-        text: sameLanguage ? phrase : `${phrase} → ${translatedForDisplay}`,
+        text: sameLanguage 
+          ? (phrase.displayText || phrase.text)
+          : `${phrase.displayText || phrase.text} → ${textToSpeak}`,
         type: 'quick',
-        lang: 'en-US',
+        lang: langCode,
         translatedLang: outputLang,
         timestamp: new Date().toISOString()
       })
@@ -142,7 +148,7 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
       console.error('Quick phrase translation failed:', err)
       setTranslatedText('')
       try {
-        speak({ text: phrase, lang: langCode, rate, pitch })
+        speak({ text: phrase.displayText || phrase.text, lang: langCode, rate, pitch })
       } catch (e) {
         console.error('Fallback quick phrase speak failed:', e)
       }
@@ -177,13 +183,13 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
         </div>
       )}
 
-      {/* Quick Phrases */}
+      {/* Quick Phrases - Now displayed in FROM language */}
       <div className="card">
         <div className="card-title"><span>⚡</span> {t.quickPhrases || "Quick Phrases"}</div>
         <p className="tts-quick-note">
           {sameLanguage
             ? t.tapToSpeak || 'Tap a phrase to speak it instantly.'
-            : t.phraseWillTranslate || `Tap a phrase — it will be translated to ${outputLang} and spoken aloud.`}
+            : t.phraseWillTranslate || `Tap a phrase in ${langCode} — it will be translated to ${outputLang} and spoken aloud.`}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {quickPhrasesTranslated.map((p, idx) => (
@@ -191,11 +197,15 @@ export default function TextToSpeech({ langCode, toLanguage, onAddToHistory, t }
               key={idx}
               className="btn btn-secondary"
               style={{ fontSize: 13, padding: '8px 14px' }}
-              onClick={() => handleQuickPhrase(p.text)}
+              onClick={() => handleQuickPhrase(p)}
               disabled={isTranslating || isSpeaking}
-              title={sameLanguage ? p.text : `${p.text} → ${p.translatedText || p.text}`}
+              title={
+                sameLanguage 
+                  ? (p.displayText || p.text)
+                  : `${p.displayText || p.text} → ${p.speakText || p.displayText || p.text}`
+              }
             >
-              {p.emoji} {sameLanguage ? p.text : (p.translatedText || p.text)}
+              {p.emoji} {p.displayText || p.text}
             </button>
           ))}
         </div>
