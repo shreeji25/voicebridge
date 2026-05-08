@@ -1,94 +1,123 @@
 // hooks/useSpeechRecognition.js
-// Custom React hook that wraps the browser's Web Speech API (SpeechRecognition).
-// Handles start/stop listening, interim results, and error states.
+// Updated: supports continuous recognition, confidence score, langCode passed to startListening()
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react';
 
-// Map our language labels to BCP-47 language codes used by the browser API
-const LANG_CODES = {
-  'en-US': 'en-US',
-  'hi-IN': 'hi-IN',
-  'gu-IN': 'gu-IN',
-}
+export function useSpeechRecognition({ langCode, onResult } = {}) {
+  const [isListening, setIsListening]   = useState(false);
+  const [interimText, setInterimText]   = useState('');
+  const [finalText, setFinalText]       = useState('');
+  const [error, setError]               = useState('');
+  const [confidence, setConfidence]     = useState(0);
+  const [isSupported, setIsSupported]   = useState(false);
+  const recognitionRef                  = useRef(null);
 
-export function useSpeechRecognition({ langCode, onResult }) {
-  const [isListening, setIsListening]   = useState(false)
-  const [interimText, setInterimText]   = useState('')
-  const [error, setError]               = useState(null)
-  const recognitionRef                  = useRef(null)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      setIsSupported(!!SR);
+    }
+  }, []);
 
-  // Check if the browser supports SpeechRecognition
-  const isSupported = typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
-
-  const startListening = useCallback(() => {
+  const startListening = (lang) => {
+    const useLang = lang || langCode || 'en-US';
     if (!isSupported) {
-      setError('Your browser does not support voice recognition. Try Chrome or Edge.')
-      return
+      setError('Speech Recognition not supported in this browser. Use Chrome or Edge.');
+      return;
     }
 
-    // Create a new instance every time (safer across languages)
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    const recognition = new SpeechRecognition()
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Always create a fresh instance (required for language switching)
+    recognitionRef.current = new SR();
+    const recognition = recognitionRef.current;
 
-    recognition.lang            = LANG_CODES[langCode] || 'en-US'
-    recognition.interimResults  = true  // Show text as you speak (not just when done)
-    recognition.continuous      = false // Stop after a natural pause
-    recognition.maxAlternatives = 1
+    recognition.lang            = useLang;
+    recognition.continuous      = true;
+    recognition.interimResults  = true;
+    recognition.maxAlternatives = 1;
 
-    // Called every time the recognition returns a result
+    recognition.onstart = () => {
+      setIsListening(true);
+      setError('');
+      setInterimText('');
+      setFinalText('');
+      setConfidence(0);
+    };
+
     recognition.onresult = (event) => {
-      let interim = ''
-      let final   = ''
+      let interim = '';
+      let final   = '';
+      let maxConfidence = 0;
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
+        const transcript = event.results[i][0].transcript;
+        const conf       = event.results[i][0].confidence;
         if (event.results[i].isFinal) {
-          final += transcript
+          final        += transcript + ' ';
+          maxConfidence = Math.max(maxConfidence, conf);
         } else {
-          interim += transcript
+          interim += transcript;
         }
       }
 
-      setInterimText(interim)
+      setInterimText(interim);
 
-      // When we have a confirmed final result, pass it up to the parent
       if (final) {
-        onResult(final.trim())
-        setInterimText('')
+        const trimmed = final.trim();
+        setFinalText(trimmed);
+        setConfidence(Math.round(maxConfidence * 100));
+        // Support both the hook-prop callback and inline usage
+        if (onResult) onResult(trimmed);
+        setInterimText('');
       }
-    }
+    };
 
     recognition.onerror = (event) => {
-      // Handle different error types with helpful messages
       const messages = {
         'not-allowed':   'Microphone access denied. Please allow mic permissions and try again.',
         'no-speech':     'No speech detected. Please try speaking clearly.',
         'audio-capture': 'No microphone found. Please connect a microphone.',
         'network':       'Network error during recognition. Check your connection.',
-      }
-      setError(messages[event.error] || `Recognition error: ${event.error}`)
-      setIsListening(false)
-    }
+      };
+      setError(messages[event.error] || `Recognition error: ${event.error}`);
+      setIsListening(false);
+    };
 
     recognition.onend = () => {
-      setIsListening(false)
-      setInterimText('')
+      setIsListening(false);
+      setInterimText('');
+    };
+
+    try {
+      recognition.start();
+    } catch (e) {
+      // Already started — ignore
     }
+  };
 
-    recognitionRef.current = recognition
-    recognition.start()
-    setIsListening(true)
-    setError(null)
-  }, [langCode, isSupported, onResult])
-
-  const stopListening = useCallback(() => {
+  const stopListening = () => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop()
+      try { recognitionRef.current.stop(); } catch (e) {}
     }
-    setIsListening(false)
-    setInterimText('')
-  }, [])
+    setIsListening(false);
+    setInterimText('');
+  };
 
-  return { isListening, interimText, error, isSupported, startListening, stopListening }
+  const resetTranscript = () => {
+    setFinalText('');
+    setInterimText('');
+    setConfidence(0);
+  };
+
+  return {
+    isListening,
+    interimText,
+    finalText,
+    error,
+    confidence,
+    isSupported,
+    startListening,
+    stopListening,
+    resetTranscript,
+  };
 }
