@@ -1,7 +1,7 @@
 // components/VoiceToText.js
 // SPEAKING tab — User SPEAKS in fromLang → transcribed → TRANSLATED to toLanguage
 // → translated text displayed + read aloud in toLanguage
-// NEW: confidence bar, phonetic pronunciation, saved phrases, context-aware UI
+// UPDATED: confidence bar, phonetic pronunciation, saved phrases, context-aware UI
 
 import { useState, useCallback, useEffect } from 'react';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
@@ -20,7 +20,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
   const sameLanguage = langCode?.split('-')[0] === outputLang?.split('-')[0];
 
   // Confidence comes from the updated hook
-  const handleResult = useCallback((text) => {
+  const handleResult = useCallback((text, confidence) => {
     setOriginalText(prev => prev ? `${prev} ${text}` : text);
     setTranslatedText('');
   }, []);
@@ -48,7 +48,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
     setPhonetic('');
     stopListening();
     cancel();
-  }, [langCode, outputLang]);
+  }, [langCode, outputLang, stopListening, cancel]);
 
   async function handleTranslateAndSpeak() {
     if (!originalText.trim()) return;
@@ -78,6 +78,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
         type: 'voice',
         lang: langCode,
         translatedLang: outputLang,
+        context: activeContext || 'General',
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -107,6 +108,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
       text: originalText,
       translated: translatedText,
       phonetic,
+      context: activeContext || 'General',
       createdAt: new Date().toLocaleDateString(),
     };
     const updated = [newPhrase, ...savedPhrases];
@@ -144,7 +146,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
     );
   }
 
-  const confidencePct = confidence || 0;
+  const confidencePct = Math.round(confidence || 0);
 
   return (
     <div>
@@ -152,7 +154,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
       {activeContext && activeContext !== 'General' && (
         <div style={{ marginBottom: 12 }}>
           <span className="badge badge-accent">
-            {activeContext} mode active
+            {activeContext} {t?.modeActive || 'mode active'}
           </span>
         </div>
       )}
@@ -226,10 +228,10 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
         </div>
 
         {/* Confidence bar */}
-        {confidencePct > 0 && (
+        {confidencePct > 0 && originalText && (
           <div className="confidence-section">
             <div className="confidence-label-row">
-              <span className="confidence-label">Recognition Confidence</span>
+              <span className="confidence-label">{t?.recognitionConfidence || 'Recognition Confidence'}</span>
               <span className="confidence-pct">{confidencePct}%</span>
             </div>
             <div className="confidence-bar">
@@ -248,15 +250,16 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
         {originalText && (
           <div className="phonetic-section" style={{ marginTop: 12 }}>
             <label className="phonetic-label" style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}>
-              Phonetic pronunciation (optional)
+              {t?.phoneticPronunciation || 'Phonetic pronunciation'} ({t?.optional || 'optional'})
             </label>
             <input
               type="text"
               className="text-input"
               value={phonetic}
               onChange={e => setPhonetic(e.target.value)}
-              placeholder="How to pronounce…"
+              placeholder={t?.howToPronounce || 'How to pronounce…'}
               style={{ fontSize: 13 }}
+              aria-label={t?.phoneticLabel || 'Phonetic pronunciation'}
             />
           </div>
         )}
@@ -281,6 +284,7 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
             className="btn btn-primary"
             onClick={handleTranslateAndSpeak}
             disabled={!originalText || isSpeaking || isTranslating}
+            aria-label={t?.translateAndReadAriaLabel || 'Translate and read aloud'}
           >
             {isTranslating
               ? (t?.translating || '⏳ Translating…')
@@ -292,28 +296,28 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
           </button>
 
           {translatedText && !isSpeaking && (
-            <button className="btn btn-secondary" onClick={handleReadAgain}>
+            <button className="btn btn-secondary" onClick={handleReadAgain} aria-label={t?.readAgainAriaLabel || 'Read the translation again'}>
               🔁 {t?.readAgain || 'Read Again'}
             </button>
           )}
 
           {isSpeaking && (
-            <button className="btn btn-danger" onClick={cancel}>
+            <button className="btn btn-danger" onClick={cancel} aria-label={t?.stopAriaLabel || 'Stop speaking'}>
               ⏹ {t?.stop || 'Stop'}
             </button>
           )}
 
-          <button className="btn btn-secondary" onClick={handleCopy} disabled={!originalText && !translatedText}>
+          <button className="btn btn-secondary" onClick={handleCopy} disabled={!originalText && !translatedText} aria-label={t?.copyAriaLabel || 'Copy text to clipboard'}>
             📋 {translatedText ? (t?.copyTranslation || 'Copy Translation') : (t?.copy || 'Copy')}
           </button>
 
           {originalText && (
-            <button className="btn btn-secondary" onClick={handleSavePhrase}>
-              ⭐ Save phrase
+            <button className="btn btn-secondary" onClick={handleSavePhrase} aria-label={t?.savePhraseAriaLabel || 'Save this phrase'}>
+              ⭐ {t?.savePhrase || 'Save phrase'}
             </button>
           )}
 
-          <button className="btn btn-secondary" onClick={handleClear} disabled={!originalText && !interimText}>
+          <button className="btn btn-secondary" onClick={handleClear} disabled={!originalText && !interimText} aria-label={t?.clearAriaLabel || 'Clear all text'}>
             🗑 {t?.clear || 'Clear'}
           </button>
         </div>
@@ -328,17 +332,18 @@ export default function VoiceToText({ langCode, toLanguage, onAddToHistory, t, a
       {/* Saved phrases */}
       {savedPhrases.length > 0 && (
         <div className="card">
-          <div className="card-title"><span>📌</span> Your Saved Phrases</div>
+          <div className="card-title"><span>📌</span> {t?.savedPhrases || 'Your Saved Phrases'}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {savedPhrases.map(p => (
               <div key={p.id} className="saved-phrase-item" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-inset)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: 'var(--text)' }}>{p.text}</div>
                   {p.phonetic && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>{p.phonetic}</div>}
+                  {p.context && p.context !== 'General' && <div style={{ fontSize: 11, color: 'var(--accent2)', marginTop: 2 }}>📍 {p.context}</div>}
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{p.createdAt}</div>
                 </div>
-                <button className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => speak({ text: p.translated || p.text, lang: outputLang })}>🔊</button>
-                <button className="btn btn-danger" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => handleDeleteSaved(p.id)}>🗑</button>
+                <button className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => speak({ text: p.translated || p.text, lang: outputLang })} aria-label={t?.playAriaLabel || 'Play phrase'}>🔊</button>
+                <button className="btn btn-danger" style={{ padding: '5px 10px', fontSize: 12 }} onClick={() => handleDeleteSaved(p.id)} aria-label={t?.deleteAriaLabel || 'Delete phrase'}>🗑</button>
               </div>
             ))}
           </div>
