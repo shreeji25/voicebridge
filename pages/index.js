@@ -173,9 +173,9 @@ export default function Home() {
       {/* ── Header ──────────────────────────────────────────────────── */}
       <header className="header">
         <div className="logo">
-          <span className="logo-icon">🌉</span>
+        
           <div>
-            <h1 className="logo-name">{t.appName}</h1>
+            <h1 className="logo-name">🌉{t.appName}</h1>
             <p className="logo-sub">{t.appSubtitle}</p>
           </div>
         </div>
@@ -183,6 +183,10 @@ export default function Home() {
         <div className="header-right">
           {/* ── Language switcher dropdown ── */}
           <div className="lang-switcher" ref={dropdownRef}>
+            <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
+          <span className="sos-btn-dot"></span>
+          SOS
+          </button>
             <button
               className="lang-switcher-btn"
               onClick={() => setDropdownOpen(prev => !prev)}
@@ -237,10 +241,7 @@ export default function Home() {
             )}
           </div>
 
-          <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
-          <span className="sos-btn-dot"></span>
-          SOS
-          </button>
+          
           <button className="help-pill" onClick={() => setHelpOpen(true)}>
             {t.helpButton}
           </button>
