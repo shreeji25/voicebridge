@@ -9,6 +9,7 @@ import QuickPhrases from "../components/QuickPhrases"
 import History from "../components/History"
 import HelpModal from "../components/HelpModal"
 import Settings from "../components/Settings"
+import EmergencyCard from "../components/Emergencycard"
 import { getT, preloadTranslation, onTranslationReady } from "../lib/translations"
 import { LANGUAGES } from "../lib/languages"
 
@@ -35,7 +36,7 @@ export default function Home() {
   const [helpOpen, setHelpOpen]     = useState(false)
   const [showBanner, setShowBanner] = useState(false)
   const [theme, setTheme]           = useState("dark")
-
+  const [showEmergencyCard, setShowEmergencyCard] = useState(false)
   // ── Load from localStorage on mount ────────────────────────────────
   useEffect(() => {
     const savedFrom  = localStorage.getItem("vb_fromLanguage")
@@ -168,12 +169,7 @@ export default function Home() {
       )}
 
       {/* ── Translation loading indicator ────────────────────────────── */}
-      {translationLoading && (
-        <div className="translation-loading-banner">
-          ⏳ {t.translationLoading || "Loading translations for selected language..."}
-        </div>
-      )}
-
+      
       {/* ── Header ──────────────────────────────────────────────────── */}
       <header className="header">
         <div className="logo">
@@ -241,6 +237,10 @@ export default function Home() {
             )}
           </div>
 
+          <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
+          <span className="sos-btn-dot"></span>
+          SOS
+          </button>
           <button className="help-pill" onClick={() => setHelpOpen(true)}>
             {t.helpButton}
           </button>
@@ -337,6 +337,19 @@ export default function Home() {
         initialFrom={fromLanguage}
         initialTo={toLanguage}
       />
+
+      {showEmergencyCard && (
+      <EmergencyCard
+      langCode={fromLanguage}
+      t={t}
+      onClose={() => setShowEmergencyCard(false)}
+      initialData={
+      typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("vb_emergencyCard") || "null")
+        : null
+      }
+     />
+     )}
     </div>
   )
 }
