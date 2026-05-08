@@ -270,7 +270,7 @@ ${translatedInfo || emergencyInfo}
         {/* Footer with actions */}
         <div className="emergency-card-footer">
           <div className="emergency-card-note">
-            💡 {t?.keepInfoUpdated || 'Keep this information up to date. It is accessible from the SOS button at any time.'}}
+            💡 {t?.keepInfoUpdated || 'Keep this information up to date. It is accessible from the SOS button at any time.'}
           </div>
 
           <div className="emergency-card-actions">
