@@ -176,9 +176,9 @@ export default function Home() {
         
           <div>
             <h1 className="logo-name">🌉{t.appName}</h1>
-            <p className="logo-sub" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <p className="logo-sub" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
               {t.appSubtitle}
-              <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
+              <button className="sos-btn" onClick={() => setShowEmergencyCard(true)} style={{ marginLeft: "auto" }}>
                 <span className="sos-btn-dot"></span>
                 SOS
               </button>
