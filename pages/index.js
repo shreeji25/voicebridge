@@ -176,17 +176,19 @@ export default function Home() {
         
           <div>
             <h1 className="logo-name">🌉{t.appName}</h1>
-            <p className="logo-sub">{t.appSubtitle}</p>
+            <p className="logo-sub" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {t.appSubtitle}
+              <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
+                <span className="sos-btn-dot"></span>
+                SOS
+              </button>
+            </p>
           </div>
         </div>
 
         <div className="header-right">
           {/* ── Language switcher dropdown ── */}
           <div className="lang-switcher" ref={dropdownRef}>
-            <button className="sos-btn" onClick={() => setShowEmergencyCard(true)}>
-          <span className="sos-btn-dot"></span>
-          SOS
-          </button>
             <button
               className="lang-switcher-btn"
               onClick={() => setDropdownOpen(prev => !prev)}
