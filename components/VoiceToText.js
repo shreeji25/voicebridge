@@ -33,9 +33,16 @@ export default function VoiceToText({
   const outputLang   = toLanguage || langCode;
   const sameLanguage = langCode?.split('-')[0] === outputLang?.split('-')[0];
 
-  const handleResult = useCallback((text /*, confidence*/) => {
+  // Use a ref so the hook always calls the latest logic without restarting recognition.
+  const handleResultRef = useRef(null);
+  handleResultRef.current = (text) => {
     setOriginalText(prev => prev ? `${prev} ${text}` : text);
     setTranslatedText('');
+  };
+
+  // Stable callback identity — delegates to the ref so it's never stale.
+  const handleResult = useCallback((text) => {
+    handleResultRef.current(text);
   }, []);
 
   const {

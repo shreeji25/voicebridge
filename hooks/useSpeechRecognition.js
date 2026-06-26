@@ -19,6 +19,10 @@ export function useSpeechRecognition({ langCode, onResult } = {}) {
     }
   }, []);
 
+  // Tracks the index up to which final results have already been sent to onResult,
+  // preventing re-processing of old results when continuous mode fires new events.
+  const sentUpToRef = useRef(-1);
+
   const startListening = (lang) => {
     const useLang = lang || langCode || 'en-US';
     if (!isSupported) {
@@ -30,6 +34,9 @@ export function useSpeechRecognition({ langCode, onResult } = {}) {
     // Always create a fresh instance (required for language switching)
     recognitionRef.current = new SR();
     const recognition = recognitionRef.current;
+
+    // Reset the sent-index whenever we start a fresh session
+    sentUpToRef.current = -1;
 
     recognition.lang            = useLang;
     recognition.continuous      = true;
@@ -53,8 +60,12 @@ export function useSpeechRecognition({ langCode, onResult } = {}) {
         const transcript = event.results[i][0].transcript;
         const conf       = event.results[i][0].confidence;
         if (event.results[i].isFinal) {
-          final        += transcript + ' ';
-          maxConfidence = Math.max(maxConfidence, conf);
+          // Only process results we haven't sent yet
+          if (i > sentUpToRef.current) {
+            final        += transcript + ' ';
+            maxConfidence = Math.max(maxConfidence, conf);
+            sentUpToRef.current = i;
+          }
         } else {
           interim += transcript;
         }
